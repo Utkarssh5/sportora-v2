@@ -1,0 +1,24 @@
+### Test 1: High-Risk Fake Tournament (No venue videos, suspicious prize pool)
+POST http://localhost:5000/api/v1/tournament/create
+Content-Type: application/json
+
+{
+  "organizerId": "66a5a72b1f120e174ed2012b",
+  "title": "Jaipur Premier Badminton League 2026",
+  "sport": "Badminton",
+  "format": "Singles",
+  "type": "SOLO",
+  "city": "Jaipur",
+  "state": "Rajasthan",
+  "locationName": "SMS Stadium, Jaipur",
+  "pincode": "302005",
+  "venuePhotos": [],
+  "venueVideos": [],
+  "permissionDocs": [],
+  "startDate": "2026-08-10T10:00:00.000Z",
+  "endDate": "2026-08-12T18:00:00.000Z",
+  "registrationDeadline": "2026-08-05T23:59:59.000Z",
+  "maxParticipants": 10,
+  "entryFee": 100,
+  "prizePool": 500000
+}
