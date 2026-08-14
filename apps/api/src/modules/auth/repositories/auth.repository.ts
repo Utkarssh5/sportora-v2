@@ -1,12 +1,12 @@
-import { User } from "../../../models/user.model.js";
-import type { IUser } from "../../../models/user.model.js";
+import { User } from "../../users/models/user.model.js";
+import type { IUser } from "../../users/models/user.model.js";
 
 export class AuthRepository {
   async findByEmail(email: string): Promise<IUser | null> {
     return User.findOne({ email });
   }
 
-  async findById(id: string): Promise<IUser | null> {
+  async findById(id: string | any): Promise<IUser | null> {
     return User.findById(id);
   }
 

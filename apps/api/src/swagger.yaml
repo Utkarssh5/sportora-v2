@@ -1,0 +1,65 @@
+openapi: 3.0.3
+info:
+  title: Sportora API
+  description: AI Powered Sports Tournament Ecosystem API
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local Development Server
+
+paths:
+  /auth/register:
+    post:
+      summary: Register New User
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password, phone, role]
+              properties:
+                fullName:
+                  type: string
+                  example: Vardaan Singh
+                email:
+                  type: string
+                  example: vardaan@sportora.in
+                password:
+                  type: string
+                  example: Password@123
+                phone:
+                  type: string
+                  example: "9876543210"
+                role:
+                  type: string
+                  example: PLAYER
+      responses:
+        '201':
+          description: User registered successfully
+
+  /auth/login:
+    post:
+      summary: Login User
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: vardaan@sportora.in
+                password:
+                  type: string
+                  example: Password@123
+      responses:
+        '200':
+          description: Login successful

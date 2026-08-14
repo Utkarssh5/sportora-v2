@@ -1,4 +1,4 @@
-import type { ITournament } from '../models/tournament.model.js';
+import type { ITournament } from '../modules/tournaments/models/tournament.model.js';
 
 export interface AIRiskResult {
   riskScore: number;
