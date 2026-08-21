@@ -1,0 +1,290 @@
+import { tournamentRegistrationRepository } from "../../tournamentRegistration/repositories/tournamentRegistration.repository.js";
+import { tournamentRepository } from "../../tournaments/repositories/tournament.repository.js";
+import { matchRepository } from "../repositories/match.repository.js";
+import {
+  MatchRound,
+  MatchStatus,
+} from "../models/match.model.js";
+
+type FixtureInput = {
+  tournamentId: string;
+  round: MatchRound;
+  matchNumber: number;
+  teamA: string;
+  teamB: string;
+};
+
+class FixtureService {
+  async generateSingleElimination(tournamentId: string) {
+    // 1. Check tournament
+    const tournament =
+      await tournamentRepository.findById(tournamentId);
+
+    if (!tournament) {
+      throw new Error("Tournament not found.");
+    }
+
+    if (tournament.status !== "APPROVED") {
+      throw new Error(
+        "Fixtures can only be generated for approved tournaments."
+      );
+    }
+
+    // 2. Get registered players
+    const registrations =
+      await tournamentRegistrationRepository.findByTournament(
+        tournamentId
+      );
+
+    if (registrations.length < 2) {
+      throw new Error(
+        "At least 2 registered players are required to generate fixtures."
+      );
+    }
+
+    // 3. Prevent duplicate fixtures
+    const existingMatches =
+      await matchRepository.findByTournament(tournamentId);
+
+    if (existingMatches.length > 0) {
+      throw new Error(
+        "Fixtures have already been generated for this tournament."
+      );
+    }
+
+    // 4. Extract player IDs
+    const players = registrations.map((registration) =>
+      registration.userId.toString()
+    );
+
+    // 5. Shuffle players
+    const shuffledPlayers = [...players].sort(
+      () => Math.random() - 0.5
+    );
+
+    // 6. Find next power of 2
+    let bracketSize = 1;
+
+    while (bracketSize < shuffledPlayers.length) {
+      bracketSize *= 2;
+    }
+
+    // 7. Add BYEs
+    while (shuffledPlayers.length < bracketSize) {
+      shuffledPlayers.push("BYE");
+    }
+
+    /*
+     * Build the complete bracket in memory first.
+     *
+     * Example for 10 players:
+     *
+     * ROUND 1       8 matches
+     * QUARTER       4 matches
+     * SEMI          2 matches
+     * FINAL         1 match
+     *
+     * Total = 15 matches
+     */
+    const rounds: FixtureInput[][] = [];
+
+    // First round
+    const firstRoundName = this.getRoundName(bracketSize);
+    const firstRoundMatches: FixtureInput[] = [];
+
+    let matchNumber = 1;
+
+    for (let i = 0; i < bracketSize; i += 2) {
+      const teamA = shuffledPlayers[i];
+      const teamB = shuffledPlayers[i + 1];
+
+      if (teamA === undefined || teamB === undefined) {
+        throw new Error("Invalid fixture generation.");
+      }
+
+      firstRoundMatches.push({
+        tournamentId,
+        round: firstRoundName,
+        matchNumber,
+        teamA,
+        teamB,
+      });
+
+      matchNumber++;
+    }
+
+    rounds.push(firstRoundMatches);
+
+    // Remaining rounds
+    let currentRoundSize = bracketSize / 2;
+
+    while (currentRoundSize >= 2) {
+      const nextRound = this.getRoundName(currentRoundSize);
+      const roundMatches: FixtureInput[] = [];
+
+      for (let i = 0; i < currentRoundSize / 2; i++) {
+        roundMatches.push({
+          tournamentId,
+          round: nextRound,
+          matchNumber,
+          teamA: "TBD",
+          teamB: "TBD",
+        });
+
+        matchNumber++;
+      }
+
+      rounds.push(roundMatches);
+      currentRoundSize /= 2;
+    }
+
+    // 8. Create all matches first
+    const createdRounds = [];
+
+    for (const round of rounds) {
+      const createdRound = [];
+
+      for (const fixture of round) {
+        const created =
+          await matchRepository.create(fixture);
+
+        createdRound.push(created);
+      }
+
+      createdRounds.push(createdRound);
+    }
+
+    /*
+     * 9. Link every match to its next-round match.
+     *
+     * Pairing:
+     *
+     * match 0 + match 1 -> next match 0
+     * match 2 + match 3 -> next match 1
+     * etc.
+     */
+    for (
+      let roundIndex = 0;
+      roundIndex < createdRounds.length - 1;
+      roundIndex++
+    ) {
+      const currentRound = createdRounds[roundIndex];
+      const nextRound = createdRounds[roundIndex + 1];
+
+      if (!currentRound || !nextRound) {
+        throw new Error(
+          "Invalid bracket: round could not be determined."
+        );
+      }
+
+      for (let i = 0; i < currentRound.length; i++) {
+        const currentMatch = currentRound[i];
+        const nextMatch = nextRound[Math.floor(i / 2)];
+
+        if (!currentMatch || !nextMatch) {
+          throw new Error(
+            "Invalid bracket: next match could not be determined."
+          );
+        }
+
+        currentMatch.nextMatchId = nextMatch._id;
+
+        await matchRepository.update(currentMatch);
+      }
+    }
+
+    /*
+     * 10. Resolve BYEs immediately.
+     *
+     * A BYE is NOT a played match.
+     * Therefore we mark the BYE fixture as CANCELLED rather than
+     * COMPLETED so profile match statistics do not count it.
+     *
+     * The real player is advanced directly to the next round.
+     */
+    const firstRoundMatches = createdRounds[0];
+
+    if (!firstRoundMatches) {
+      throw new Error(
+        "Invalid bracket: first round could not be determined."
+      );
+    }
+
+    for (const firstRoundMatch of firstRoundMatches) {
+      const teamA = firstRoundMatch.teamA;
+      const teamB = firstRoundMatch.teamB;
+
+      if (teamA !== "BYE" && teamB !== "BYE") {
+        continue;
+      }
+
+      const player =
+        teamA !== "BYE" ? teamA : teamB;
+
+      if (
+        !player ||
+        player === "BYE" ||
+        !firstRoundMatch.nextMatchId
+      ) {
+        continue;
+      }
+
+      firstRoundMatch.status = MatchStatus.CANCELLED;
+      await matchRepository.update(firstRoundMatch);
+
+      const nextMatch =
+        await matchRepository.findById(
+          firstRoundMatch.nextMatchId.toString()
+        );
+
+      if (!nextMatch) {
+        throw new Error(
+          "Next match could not be found while resolving BYE."
+        );
+      }
+
+      if (nextMatch.teamA === "TBD") {
+        nextMatch.teamA = player;
+      } else if (nextMatch.teamB === "TBD") {
+        nextMatch.teamB = player;
+      } else if (
+        nextMatch.teamA !== player &&
+        nextMatch.teamB !== player
+      ) {
+        throw new Error(
+          "Next match already contains two different teams."
+        );
+      }
+
+      await matchRepository.update(nextMatch);
+    }
+
+    const createdMatches = createdRounds.flat();
+
+    return {
+      tournamentId,
+      totalPlayers: players.length,
+      bracketSize,
+      totalMatches: createdMatches.length,
+      matches: createdMatches,
+    };
+  }
+
+  private getRoundName(size: number): MatchRound {
+    switch (size) {
+      case 2:
+        return MatchRound.FINAL;
+
+      case 4:
+        return MatchRound.SEMI_FINAL;
+
+      case 8:
+        return MatchRound.QUARTER_FINAL;
+
+      default:
+        return MatchRound.ROUND_1;
+    }
+  }
+}
+
+export const fixtureService = new FixtureService();

@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DEFAULT DARK ARENA THEME */
+:root, [data-theme="dark"] {
+  --bg-primary: #080B10;
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --nav-bg: #080B10;
+}
+
+/* SOFT AESTHETIC LIGHT THEME (Clean Slate, No Neon Green Override) */
+[data-theme="light"] {
+  --bg-primary: #F8FAF9;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --card-bg: #FFFFFF;
+  --card-border: rgba(15, 23, 42, 0.12);
+  --nav-bg: #F8FAF9;
+}
+
+html, body {
+  scroll-behavior: smooth;
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f293d;
+  border-radius: 9999px;
+}
+
+/* Glassmorphism */
+.clean-glass {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: var(--card-border) !important;
+}
+
+/* Direct Text Contrast Overrides for Light Mode */
+[data-theme="light"] .text-white {
+  color: #0F172A !important;
+}
+
+[data-theme="light"] .text-gray-300,
+[data-theme="light"] .text-gray-400 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .bg-\[\#080B10\] {
+  background-color: #F8FAF9 !important;
+}
+
+[data-theme="light"] nav {
+  background-color: var(--nav-bg) !important;
+}

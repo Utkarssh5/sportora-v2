@@ -24,11 +24,17 @@ export const generateFixtures = async (
     if (
       error.message === "Tournament not found." ||
       error.message ===
-        "At least 2 registered players are required to generate fixtures." ||
+        "At least 2 approved competition entries are required to generate fixtures." ||
       error.message ===
         "Fixtures have already been generated for this tournament." ||
       error.message ===
-        "Fixtures can only be generated for approved tournaments."
+        "Fixtures can only be generated for approved tournaments." ||
+      error.message ===
+        "Knockout fixture generation currently supports only KNOCKOUT format." ||
+      error.message ===
+        "Fixtures can only be generated after the registration deadline." ||
+      error.message ===
+        "Knockout tournaments support a maximum of 100 competition entries."
     ) {
       return res.status(400).json({
         success: false,

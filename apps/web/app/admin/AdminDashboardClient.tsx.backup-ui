@@ -1,0 +1,795 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+type OrganizerRequest = {
+  _id: string;
+  organizationName: string;
+  governmentIdType: string;
+  governmentId: string;
+  documentUrl: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  status: string;
+  remarks?: string;
+  organizer?: {
+    _id?: string;
+    fullName?: string;
+    email?: string;
+  };
+  createdAt?: string;
+};
+
+type VenueRequest = {
+  _id: string;
+  tournament?: {
+    _id?: string;
+    title?: string;
+    status?: string;
+  };
+  organizer?: {
+    _id?: string;
+    fullName?: string;
+    email?: string;
+  };
+  venueName: string;
+  venueAddress: string;
+  city: string;
+  state: string;
+  pincode: string;
+  venuePhotos: string[];
+  venueVideos: string[];
+  permissionDocs: string[];
+  status: string;
+  remarks?: string;
+  proofDeadline?: string;
+  createdAt?: string;
+};
+
+type Tournament = {
+  _id: string;
+  title: string;
+  sport: string;
+  format: string;
+  type: string;
+  competitionType?: string;
+  city: string;
+  state: string;
+  locationName: string;
+  pincode: string;
+  startDate: string;
+  endDate: string;
+  registrationDeadline: string;
+  maxParticipants: number;
+  registeredParticipants: number;
+  entryFee: number;
+  prizePool: number;
+  status: string;
+  organizerId?: string;
+  aiRiskScore?: number;
+  aiRiskAnalysis?: string;
+};
+
+type ActionState = {
+  id: string;
+  action: string;
+} | null;
+
+export default function AdminDashboardClient() {
+  const [organizers, setOrganizers] = useState<OrganizerRequest[]>([]);
+  const [venues, setVenues] = useState<VenueRequest[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [action, setAction] = useState<ActionState>(null);
+
+  const [remarksTarget, setRemarksTarget] = useState<{
+    type: 'organizer' | 'venue' | 'tournament';
+    id: string;
+    action: 'reject' | 'more-proof';
+  } | null>(null);
+
+  const [remarks, setRemarks] = useState('');
+  const [proofDeadline, setProofDeadline] = useState('');
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const [organizerResponse, venueResponse, tournamentResponse] =
+        await Promise.all([
+          fetch('/api/admin/organizer-verification', {
+            cache: 'no-store',
+          }),
+          fetch('/api/venue-verification/all', {
+            cache: 'no-store',
+          }),
+          fetch('/api/admin/tournaments', {
+            cache: 'no-store',
+          }),
+        ]);
+
+      const [organizerData, venueData, tournamentData] =
+        await Promise.all([
+          organizerResponse.json(),
+          venueResponse.json(),
+          tournamentResponse.json(),
+        ]);
+
+      if (!organizerResponse.ok || !organizerData.success) {
+        throw new Error(
+          organizerData.error || 'Failed to load organizer verification.',
+        );
+      }
+
+      if (!venueResponse.ok || !venueData.success) {
+        throw new Error(
+          venueData.error || 'Failed to load venue verification.',
+        );
+      }
+
+      if (!tournamentResponse.ok || !tournamentData.success) {
+        throw new Error(
+          tournamentData.error || 'Failed to load tournaments.',
+        );
+      }
+
+      setOrganizers(organizerData.data ?? []);
+      setVenues(venueData.data ?? []);
+      setTournaments(tournamentData.data ?? []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to load Admin Portal data.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const pendingOrganizers = useMemo(
+    () => organizers.filter((item) => item.status === 'PENDING'),
+    [organizers],
+  );
+
+  const pendingVenues = useMemo(
+    () => venues.filter((item) => item.status === 'PENDING'),
+    [venues],
+  );
+
+  const pendingTournaments = useMemo(
+    () =>
+      tournaments.filter(
+        (item) => item.status === 'PENDING_APPROVAL',
+      ),
+    [tournaments],
+  );
+
+  const runAction = async (
+    type: 'organizer' | 'venue' | 'tournament',
+    id: string,
+    endpoint: string,
+    body: Record<string, unknown> = {},
+  ) => {
+    try {
+      setAction({ id, action: endpoint });
+
+      const basePath =
+        type === 'organizer'
+          ? '/api/admin/organizer-verification'
+          : type === 'venue'
+            ? '/api/venue-verification'
+            : '/api/admin/tournaments';
+
+      const response = await fetch(`${basePath}/${id}/${endpoint}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || data.message || 'Action failed.',
+        );
+      }
+
+      setRemarksTarget(null);
+      setRemarks('');
+      setProofDeadline('');
+
+      await loadData();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : 'Action failed.',
+      );
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const submitRemarksAction = async () => {
+    if (!remarksTarget) return;
+
+    const body: Record<string, unknown> = {
+      remarks: remarks.trim(),
+    };
+
+    if (remarksTarget.action === 'more-proof' && proofDeadline) {
+      body.proofDeadline = new Date(
+        `${proofDeadline}T23:59:59`,
+      ).toISOString();
+    }
+
+    await runAction(
+      remarksTarget.type,
+      remarksTarget.id,
+      remarksTarget.action,
+      body,
+    );
+  };
+
+  const isBusy = (id: string, endpoint: string) =>
+    action?.id === id && action.action === endpoint;
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-8 text-white">
+        <div className="mx-auto max-w-7xl">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-10">
+            <p className="text-sm text-slate-400">
+              Loading Sportora Admin Control Center...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto max-w-7xl space-y-8 p-6 md:p-8">
+
+        <header className="flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-sky-400">
+              SPORTORA ADMIN
+            </p>
+            <h1 className="mt-2 text-3xl font-black">
+              Control Center
+            </h1>
+            <p className="mt-2 text-sm text-slate-400">
+              Review organizers, venue proofs and tournament approvals.
+            </p>
+          </div>
+
+          <button
+            onClick={loadData}
+            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold transition hover:border-sky-500 hover:bg-slate-800"
+          >
+            ↻ Refresh
+          </button>
+        </header>
+
+        {error && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
+            {error}
+          </div>
+        )}
+
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-amber-500/20 bg-slate-900 p-5">
+            <p className="text-xs font-bold uppercase text-amber-400">
+              Organizer Reviews
+            </p>
+            <p className="mt-2 text-3xl font-black">
+              {pendingOrganizers.length}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Pending verification
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-purple-500/20 bg-slate-900 p-5">
+            <p className="text-xs font-bold uppercase text-purple-400">
+              Venue Reviews
+            </p>
+            <p className="mt-2 text-3xl font-black">
+              {pendingVenues.length}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Awaiting proof review
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-sky-500/20 bg-slate-900 p-5">
+            <p className="text-xs font-bold uppercase text-sky-400">
+              Tournament Approval
+            </p>
+            <p className="mt-2 text-3xl font-black">
+              {pendingTournaments.length}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Pending approval
+            </p>
+          </div>
+        </section>
+
+        {/* ORGANIZER VERIFICATION */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-black">
+              🛡️ Organizer Verification
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Verify the identity and legitimacy of organizers.
+            </p>
+          </div>
+
+          {pendingOrganizers.length === 0 ? (
+            <EmptyState text="No pending organizer verification requests." />
+          ) : (
+            <div className="grid gap-4">
+              {pendingOrganizers.map((item) => (
+                <article
+                  key={item._id}
+                  className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+                >
+                  <div className="flex flex-col gap-5 lg:flex-row lg:justify-between">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-bold">
+                          {item.organizationName}
+                        </h3>
+                        <p className="text-sm text-slate-400">
+                          {item.organizer?.fullName || 'Unknown organizer'}
+                          {' • '}
+                          {item.organizer?.email || 'No email'}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-3 text-sm md:grid-cols-2">
+                        <Info label="Government ID">
+                          {item.governmentIdType}: {item.governmentId}
+                        </Info>
+                        <Info label="Address">
+                          {item.address}, {item.city}, {item.state} -{' '}
+                          {item.pincode}
+                        </Info>
+                      </div>
+
+                      {item.documentUrl && (
+                        <a
+                          href={item.documentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex text-sm font-semibold text-sky-400 hover:text-sky-300"
+                        >
+                          📄 Open ID Proof
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 flex-col gap-2 lg:w-44">
+                      <button
+                        disabled={Boolean(action)}
+                        onClick={() =>
+                          runAction(
+                            'organizer',
+                            item._id,
+                            'approve',
+                          )
+                        }
+                        className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        {isBusy(item._id, 'approve')
+                          ? 'Approving...'
+                          : '✓ Approve'}
+                      </button>
+
+                      <button
+                        disabled={Boolean(action)}
+                        onClick={() => {
+                          setRemarksTarget({
+                            type: 'organizer',
+                            id: item._id,
+                            action: 'reject',
+                          });
+                          setRemarks(item.remarks || '');
+                        }}
+                        className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
+                      >
+                        ✕ Reject
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* VENUE VERIFICATION */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-black">
+              📍 Venue Verification
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Confirm that the tournament has credible venue and permission
+              proof.
+            </p>
+          </div>
+
+          {venues.length === 0 ? (
+            <EmptyState text="No venue verification requests found." />
+          ) : (
+            <div className="grid gap-4">
+              {venues.map((item) => (
+                <article
+                  key={item._id}
+                  className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+                >
+                  <div className="flex flex-col gap-5 lg:flex-row lg:justify-between">
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div>
+                          <h3 className="text-lg font-bold">
+                            {item.tournament?.title || 'Tournament'}
+                          </h3>
+                          <p className="text-sm text-slate-400">
+                            {item.organizer?.fullName || 'Unknown organizer'}
+                            {' • '}
+                            {item.organizer?.email || 'No email'}
+                          </p>
+                        </div>
+
+                        <StatusBadge status={item.status} />
+                      </div>
+
+                      <div className="grid gap-3 text-sm md:grid-cols-2">
+                        <Info label="Venue">
+                          {item.venueName}
+                        </Info>
+                        <Info label="Location">
+                          {item.venueAddress}, {item.city},{' '}
+                          {item.state} - {item.pincode}
+                        </Info>
+                      </div>
+
+                      {item.remarks && (
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-200">
+                          <span className="font-bold">Remarks:</span>{' '}
+                          {item.remarks}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        {item.venuePhotos.map((url, index) => (
+                          <a
+                            key={`photo-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-sky-400 hover:border-sky-500"
+                          >
+                            📷 Photo {index + 1}
+                          </a>
+                        ))}
+
+                        {item.venueVideos.map((url, index) => (
+                          <a
+                            key={`video-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-sky-400 hover:border-sky-500"
+                          >
+                            🎥 Video {index + 1}
+                          </a>
+                        ))}
+
+                        {item.permissionDocs.map((url, index) => (
+                          <a
+                            key={`doc-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-sky-400 hover:border-sky-500"
+                          >
+                            📄 Permission {index + 1}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+
+                    {item.status === 'PENDING' && (
+                      <div className="flex shrink-0 flex-col gap-2 lg:w-44">
+                        <button
+                          disabled={Boolean(action)}
+                          onClick={() =>
+                            runAction('venue', item._id, 'approve')
+                          }
+                          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          {isBusy(item._id, 'approve')
+                            ? 'Approving...'
+                            : '✓ Approve'}
+                        </button>
+
+                        <button
+                          disabled={Boolean(action)}
+                          onClick={() => {
+                            setRemarksTarget({
+                              type: 'venue',
+                              id: item._id,
+                              action: 'more-proof',
+                            });
+                            setRemarks(item.remarks || '');
+                          }}
+                          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm font-bold text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+                        >
+                          + More Proof
+                        </button>
+
+                        <button
+                          disabled={Boolean(action)}
+                          onClick={() => {
+                            setRemarksTarget({
+                              type: 'venue',
+                              id: item._id,
+                              action: 'reject',
+                            });
+                            setRemarks(item.remarks || '');
+                          }}
+                          className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* TOURNAMENT APPROVAL */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-black">
+              🏆 Tournament Approval
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Final approval happens only after venue verification is approved.
+            </p>
+          </div>
+
+          {pendingTournaments.length === 0 ? (
+            <EmptyState text="No tournaments are waiting for approval." />
+          ) : (
+            <div className="grid gap-4">
+              {pendingTournaments.map((item) => (
+                <article
+                  key={item._id}
+                  className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
+                >
+                  <div className="flex flex-col gap-5 lg:flex-row lg:justify-between">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-lg font-bold">
+                            {item.title}
+                          </h3>
+                          <StatusBadge status={item.status} />
+                        </div>
+
+                        <p className="mt-1 text-sm text-slate-400">
+                          {item.sport} • {item.competitionType || item.type}
+                          {' • '}
+                          {item.city}, {item.state}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-3 text-sm md:grid-cols-3">
+                        <Info label="Venue">
+                          {item.locationName}
+                        </Info>
+                        <Info label="Dates">
+                          {formatDate(item.startDate)} →{' '}
+                          {formatDate(item.endDate)}
+                        </Info>
+                        <Info label="Entry Fee">
+                          ₹{item.entryFee.toLocaleString('en-IN')}
+                        </Info>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                        <span>
+                          Participants: {item.registeredParticipants}/
+                          {item.maxParticipants}
+                        </span>
+                        <span>
+                          Prize Pool: ₹
+                          {item.prizePool.toLocaleString('en-IN')}
+                        </span>
+                        {typeof item.aiRiskScore === 'number' && (
+                          <span>
+                            AI Risk Score: {item.aiRiskScore}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col gap-2 lg:w-44">
+                      <button
+                        disabled={Boolean(action)}
+                        onClick={() =>
+                          runAction(
+                            'tournament',
+                            item._id,
+                            'approve',
+                          )
+                        }
+                        className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        {isBusy(item._id, 'approve')
+                          ? 'Approving...'
+                          : '✓ Approve'}
+                      </button>
+
+                      <button
+                        disabled={Boolean(action)}
+                        onClick={() => {
+                          setRemarksTarget({
+                            type: 'tournament',
+                            id: item._id,
+                            action: 'reject',
+                          });
+                          setRemarks('');
+                        }}
+                        className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
+                      >
+                        ✕ Reject
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {remarksTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="text-xl font-black">
+              {remarksTarget.action === 'more-proof'
+                ? 'Request More Proof'
+                : 'Add Review Remarks'}
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-400">
+              {remarksTarget.action === 'more-proof'
+                ? 'Tell the organizer exactly what additional proof is required.'
+                : 'These remarks will be stored with the review decision.'}
+            </p>
+
+            <textarea
+              value={remarks}
+              onChange={(event) => setRemarks(event.target.value)}
+              placeholder="Enter remarks..."
+              rows={4}
+              className="mt-5 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-sky-500"
+            />
+
+            {remarksTarget.action === 'more-proof' && (
+              <div className="mt-4">
+                <label className="text-xs font-bold uppercase text-slate-400">
+                  Proof Deadline
+                </label>
+                <input
+                  type="date"
+                  value={proofDeadline}
+                  onChange={(event) =>
+                    setProofDeadline(event.target.value)
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm outline-none focus:border-sky-500"
+                />
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setRemarksTarget(null);
+                  setRemarks('');
+                  setProofDeadline('');
+                }}
+                className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={submitRemarksAction}
+                disabled={Boolean(action)}
+                className="rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold hover:bg-sky-500 disabled:opacity-50"
+              >
+                {action ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function Info({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-sm text-slate-200">{children}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles =
+    status === 'APPROVED'
+      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+      : status === 'REJECTED'
+        ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+        : status === 'MORE_PROOF_REQUIRED'
+          ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+          : 'bg-sky-500/10 text-sky-300 border-sky-500/20';
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase ${styles}`}
+    >
+      {status.replaceAll('_', ' ')}
+    </span>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/50 p-8 text-center text-sm text-slate-500">
+      ✓ {text}
+    </div>
+  );
+}
+
+function formatDate(value: string) {
+  if (!value) return '—';
+
+  return new Date(value).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}

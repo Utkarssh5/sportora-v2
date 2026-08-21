@@ -1,0 +1,48 @@
+import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongodb';
+import { Tournament, Registration } from '@/models/Database';
+import { authorize } from '@/lib/middleware';
+
+export async function POST(req: Request) {
+  const auth = authorize(req);
+  if (!auth.isAuthorized) return auth.response;
+
+  try {
+    const { tournamentId, teamName, contactPhone } = await req.json();
+
+    if (!tournamentId || !teamName || !contactPhone) {
+      return NextResponse.json({ error: 'Tournament ID, Team Name, and Contact Phone are required' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+    const tournament = await Tournament.findById(tournamentId);
+
+    if (!tournament) {
+      return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
+    }
+
+    if (tournament.registeredTeams.length >= tournament.maxTeams) {
+      return NextResponse.json({ error: 'Tournament is fully booked!' }, { status: 400 });
+    }
+
+    // Register team
+    const registration = await Registration.create({
+      tournamentId,
+      userId: auth.user.userId,
+      teamName,
+      contactPhone
+    });
+
+    // Add team to tournament
+    tournament.registeredTeams.push(teamName);
+    await tournament.save();
+
+    return NextResponse.json({
+      success: true,
+      message: 'Registration successful!',
+      registration
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

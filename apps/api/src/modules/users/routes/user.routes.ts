@@ -20,9 +20,27 @@ const router = Router();
  *         description: Unauthorized
  */
 router.get(
+  "/search",
+  authMiddleware,
+  (req, res) => userController.searchPlayers(req, res)
+);
+
+router.get(
   "/me",
   authMiddleware,
   (req, res) => userController.getMe(req, res)
+);
+
+router.get(
+  "/me/performance",
+  authMiddleware,
+  (req, res) => userController.getPerformance(req, res)
+);
+
+router.patch(
+  "/me",
+  authMiddleware,
+  (req, res) => userController.updateProfile(req, res)
 );
 
 export default router;

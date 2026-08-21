@@ -7,6 +7,9 @@ import {
 
 import {
   registerCrew,
+  getMyCrewProfile,
+  getCrewProfilePreview,
+  updateCrewProfile,
   getAvailableCrew,
   updateCrewAvailability,
 } from "../controllers/crew.controller.js";
@@ -16,8 +19,29 @@ const router = Router();
 router.post(
   "/register",
   authMiddleware,
-  authorize("PLAYER", "CREW"),
+  authorize("PLAYER", "ORGANIZER"),
   registerCrew
+);
+
+router.get(
+  "/me",
+  authMiddleware,
+  authorize("PLAYER", "ORGANIZER"),
+  getMyCrewProfile
+);
+
+router.patch(
+  "/me",
+  authMiddleware,
+  authorize("PLAYER", "ORGANIZER"),
+  updateCrewProfile
+);
+
+router.get(
+  "/:crewId/profile",
+  authMiddleware,
+  authorize("PLAYER", "ORGANIZER", "ADMIN"),
+  getCrewProfilePreview
 );
 
 router.get(
@@ -28,7 +52,7 @@ router.get(
 router.patch(
   "/availability",
   authMiddleware,
-  authorize("PLAYER", "CREW"),
+  authorize("PLAYER", "ORGANIZER"),
   updateCrewAvailability
 );
 

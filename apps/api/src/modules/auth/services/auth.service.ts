@@ -5,6 +5,8 @@ import { authRepository } from "../repositories/auth.repository.js";
 import type { RegisterInput } from "../schemas/register.schema.js";
 import type { LoginInput } from "../schemas/login.schema.js";
 
+import { organizerVerificationRepository } from "../../organizerVerification/repositories/organizerVerification.repository.js";
+import { VerificationStatus } from "../../organizerVerification/models/organizerVerification.model.js";
 import type { IUser } from "../../users/models/user.model.js";
 
 import {
@@ -37,7 +39,24 @@ export class AuthService {
       payload.role = data.role;
     }
     
-    return authRepository.create(payload);
+    const user = await authRepository.create(payload);
+
+    if (data.role === "ORGANIZER") {
+      await organizerVerificationRepository.create({
+        organizer: user._id as any,
+        organizationName: data.organizationName!,
+        governmentIdType: data.governmentIdType!,
+        governmentId: data.governmentId!,
+        documentUrl: data.documentUrl!,
+        address: data.address!,
+        city: data.city!,
+        state: data.state!,
+        pincode: data.pincode!,
+        status: VerificationStatus.PENDING,
+      });
+    }
+
+    return user;
   }
 
   async login(data: LoginInput) {
@@ -60,6 +79,7 @@ export class AuthService {
       id: user._id,
       email: user.email,
       role: user.role,
+      mustChangePassword: user.mustChangePassword === true,
     });
 
     const refreshToken = generateRefreshToken({
@@ -88,6 +108,7 @@ export class AuthService {
       id: user._id,
       email: user.email,
       role: user.role,
+      mustChangePassword: user.mustChangePassword === true,
     });
 
     return {

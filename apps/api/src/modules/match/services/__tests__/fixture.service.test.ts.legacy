@@ -1,0 +1,462 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  calculateKnockoutBracket,
+  createKnockoutFixturePlan,
+} from "../fixture.service.js";
+
+const cases = [
+  { players: 2, bracket: 2, byes: 0, openingMatches: 1, realMatches: 1 },
+  { players: 3, bracket: 4, byes: 1, openingMatches: 2, realMatches: 1 },
+  { players: 4, bracket: 4, byes: 0, openingMatches: 2, realMatches: 2 },
+  { players: 5, bracket: 8, byes: 3, openingMatches: 4, realMatches: 1 },
+  { players: 7, bracket: 8, byes: 1, openingMatches: 4, realMatches: 3 },
+  { players: 8, bracket: 8, byes: 0, openingMatches: 4, realMatches: 4 },
+  { players: 13, bracket: 16, byes: 3, openingMatches: 8, realMatches: 5 },
+  { players: 16, bracket: 16, byes: 0, openingMatches: 8, realMatches: 8 },
+  { players: 27, bracket: 32, byes: 5, openingMatches: 16, realMatches: 11 },
+  { players: 32, bracket: 32, byes: 0, openingMatches: 16, realMatches: 16 },
+  { players: 56, bracket: 64, byes: 8, openingMatches: 32, realMatches: 24 },
+  { players: 73, bracket: 128, byes: 55, openingMatches: 64, realMatches: 9 },
+  { players: 100, bracket: 128, byes: 28, openingMatches: 64, realMatches: 36 },
+] as const;
+
+test("knockout bracket handles supported participant counts", () => {
+  for (const expected of cases) {
+    const actual =
+      calculateKnockoutBracket(expected.players);
+
+    assert.equal(actual.participantCount, expected.players);
+    assert.equal(actual.bracketSize, expected.bracket);
+    assert.equal(actual.byeCount, expected.byes);
+    assert.equal(
+      actual.openingMatchCount,
+      expected.openingMatches
+    );
+    assert.equal(
+      actual.realOpeningMatches,
+      expected.realMatches
+    );
+    assert.equal(
+      actual.totalMatches,
+      expected.bracket - 1
+    );
+  }
+});
+
+test("knockout round sizes always end with one final", () => {
+  for (const expected of cases) {
+    const actual =
+      calculateKnockoutBracket(expected.players);
+
+    assert.equal(
+      actual.roundSizes.at(-1),
+      1
+    );
+
+    assert.equal(
+      actual.roundSizes.reduce(
+        (total, count) => total + count,
+        0
+      ),
+      actual.totalMatches
+    );
+  }
+});
+
+test("knockout rejects fewer than two participants", () => {
+  assert.throws(
+    () => calculateKnockoutBracket(1),
+    /at least 2 participants/i
+  );
+});
+
+test("knockout rejects more than 100 participants", () => {
+  assert.throws(
+    () => calculateKnockoutBracket(101),
+    /maximum of 100 participants/i
+  );
+});
+
+test("knockout rejects non-integer participant counts", () => {
+  assert.throws(
+    () => calculateKnockoutBracket(7.5),
+    /at least 2 participants/i
+  );
+});
+
+test("100-player knockout has exactly 28 BYEs and 36 real opening matches", () => {
+  const bracket =
+    calculateKnockoutBracket(100);
+
+  assert.equal(bracket.bracketSize, 128);
+  assert.equal(bracket.openingMatchCount, 64);
+  assert.equal(bracket.byeCount, 28);
+  assert.equal(bracket.realOpeningMatches, 36);
+  assert.equal(bracket.totalMatches, 127);
+
+  assert.equal(
+    bracket.byeCount + bracket.realOpeningMatches,
+    bracket.openingMatchCount
+  );
+});
+
+test("73-player knockout has exactly 55 BYEs and 9 real opening matches", () => {
+  const bracket =
+    calculateKnockoutBracket(73);
+
+  assert.equal(bracket.bracketSize, 128);
+  assert.equal(bracket.openingMatchCount, 64);
+  assert.equal(bracket.byeCount, 55);
+  assert.equal(bracket.realOpeningMatches, 9);
+  assert.equal(bracket.totalMatches, 127);
+});
+
+test("56-player knockout produces a 64-slot bracket", () => {
+  const bracket =
+    calculateKnockoutBracket(56);
+
+  assert.equal(bracket.bracketSize, 64);
+  assert.equal(bracket.openingMatchCount, 32);
+  assert.equal(bracket.byeCount, 8);
+  assert.equal(bracket.realOpeningMatches, 24);
+  assert.equal(bracket.totalMatches, 63);
+});
+
+function makePlayers(count: number): string[] {
+  return Array.from(
+    { length: count },
+    (_, index) => `player-${index + 1}`
+  );
+}
+
+test("100-player fixture planner creates a complete 127-match bracket", () => {
+  const players = makePlayers(100);
+
+  const plan =
+    createKnockoutFixturePlan(
+      "tournament-100",
+      players
+    );
+
+  assert.equal(plan.participantCount, 100);
+  assert.equal(plan.bracketSize, 128);
+  assert.equal(plan.byeCount, 28);
+  assert.equal(plan.matches.length, 127);
+
+  const openingMatches =
+    plan.matches.filter(
+      (match) => match.round === "ROUND_1"
+    );
+
+  assert.equal(openingMatches.length, 64);
+
+  const byeMatches =
+    openingMatches.filter(
+      (match) => match.isBye
+    );
+
+  const realMatches =
+    openingMatches.filter(
+      (match) => !match.isBye
+    );
+
+  assert.equal(byeMatches.length, 28);
+  assert.equal(realMatches.length, 36);
+});
+
+test("fixture planner never creates BYE vs BYE", () => {
+  for (const playerCount of [
+    2,
+    3,
+    7,
+    13,
+    27,
+    56,
+    73,
+    100,
+  ]) {
+    const plan =
+      createKnockoutFixturePlan(
+        `tournament-${playerCount}`,
+        makePlayers(playerCount)
+      );
+
+    for (const match of plan.matches) {
+      assert.notEqual(
+        match.teamA === "BYE" &&
+          match.teamB === "BYE",
+        true
+      );
+    }
+  }
+});
+
+test("fixture planner places every player exactly once in opening matches", () => {
+  for (const playerCount of [
+    2,
+    3,
+    7,
+    13,
+    27,
+    56,
+    73,
+    100,
+  ]) {
+    const players = makePlayers(playerCount);
+
+    const plan =
+      createKnockoutFixturePlan(
+        `tournament-${playerCount}`,
+        players
+      );
+
+    const openingMatchCount =
+      plan.bracketSize / 2;
+
+    const openingMatches =
+      plan.matches.slice(
+        0,
+        openingMatchCount
+      );
+
+    assert.equal(
+      openingMatches.length,
+      openingMatchCount
+    );
+
+    const placedPlayers =
+      openingMatches.flatMap(
+        (match) =>
+          [match.teamA, match.teamB].filter(
+            (player) => player !== "BYE"
+          )
+      );
+
+    assert.equal(
+      placedPlayers.length,
+      playerCount
+    );
+
+    assert.equal(
+      new Set(placedPlayers).size,
+      playerCount
+    );
+
+    for (const player of players) {
+      assert.equal(
+        placedPlayers.includes(player),
+        true
+      );
+    }
+  }
+});
+
+test("fixture planner links every non-final match to a valid next match", () => {
+  const plan =
+    createKnockoutFixturePlan(
+      "tournament-links",
+      makePlayers(100)
+    );
+
+  const finalIndex =
+    plan.matches.findIndex(
+      (match) =>
+        match.round === "FINAL"
+    );
+
+  assert.notEqual(finalIndex, -1);
+
+  for (
+    let index = 0;
+    index < plan.matches.length;
+    index++
+  ) {
+    const match = plan.matches[index];
+
+    if (!match) continue;
+
+    if (index === finalIndex) {
+      assert.equal(
+        match.nextMatchIndex,
+        undefined
+      );
+      continue;
+    }
+
+    assert.notEqual(
+      match.nextMatchIndex,
+      undefined
+    );
+
+    assert.ok(
+      match.nextMatchIndex! > index
+    );
+
+    assert.ok(
+      match.nextMatchIndex! <
+        plan.matches.length
+    );
+  }
+});
+
+test("fixture planner rejects duplicate players", () => {
+  assert.throws(
+    () =>
+      createKnockoutFixturePlan(
+        "tournament-duplicate",
+        [
+          "player-1",
+          "player-2",
+          "player-2",
+        ]
+      ),
+    /duplicate participants/i
+  );
+});
+
+test("fixture planner maps every opening match to the correct next-round match", () => {
+  for (const playerCount of [
+    3,
+    7,
+    13,
+    27,
+    56,
+    73,
+    100,
+  ]) {
+    const plan =
+      createKnockoutFixturePlan(
+        `tournament-links-${playerCount}`,
+        makePlayers(playerCount)
+      );
+
+    const openingMatchCount =
+      plan.bracketSize / 2;
+
+    const nextRoundStart =
+      openingMatchCount;
+
+    const openingMatches =
+      plan.matches.slice(
+        0,
+        openingMatchCount
+      );
+
+    assert.equal(
+      openingMatches.length,
+      openingMatchCount
+    );
+
+    for (
+      let index = 0;
+      index < openingMatches.length;
+      index++
+    ) {
+      const match = openingMatches[index];
+
+      assert.ok(match);
+
+      assert.equal(
+        match.nextMatchIndex,
+        nextRoundStart +
+          Math.floor(index / 2)
+      );
+    }
+  }
+});
+
+test("every BYE match has exactly one real participant", () => {
+  for (const playerCount of [
+    3,
+    7,
+    13,
+    27,
+    56,
+    73,
+    100,
+  ]) {
+    const plan =
+      createKnockoutFixturePlan(
+        `tournament-byes-${playerCount}`,
+        makePlayers(playerCount)
+      );
+
+    const openingMatchCount =
+      plan.bracketSize / 2;
+
+    const openingMatches =
+      plan.matches.slice(
+        0,
+        openingMatchCount
+      );
+
+    const byeMatches =
+      openingMatches.filter(
+        (match) => match.isBye
+      );
+
+    assert.equal(
+      byeMatches.length,
+      plan.byeCount
+    );
+
+    for (const match of byeMatches) {
+      const realParticipants =
+        [match.teamA, match.teamB].filter(
+          (player) => player !== "BYE"
+        );
+
+      assert.equal(
+        realParticipants.length,
+        1
+      );
+
+      assert.equal(
+        match.teamA === "BYE" ||
+          match.teamB === "BYE",
+        true
+      );
+
+      assert.notEqual(
+        match.nextMatchIndex,
+        undefined
+      );
+    }
+  }
+});
+
+test("final match never has a next-match link", () => {
+  for (const playerCount of [
+    2,
+    3,
+    7,
+    13,
+    27,
+    56,
+    73,
+    100,
+  ]) {
+    const plan =
+      createKnockoutFixturePlan(
+        `tournament-final-${playerCount}`,
+        makePlayers(playerCount)
+      );
+
+    const finalMatch =
+      plan.matches.at(-1);
+
+    assert.ok(finalMatch);
+
+    assert.equal(
+      finalMatch.round,
+      "FINAL"
+    );
+
+    assert.equal(
+      finalMatch.nextMatchIndex,
+      undefined
+    );
+  }
+});

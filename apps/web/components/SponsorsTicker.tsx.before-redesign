@@ -1,0 +1,32 @@
+'use client';
+
+import { motion } from 'framer-motion';
+
+const SPONSORS = [
+  'YONEX', 'RED BULL', 'RAZORPAY', 'PUMA', 'DECATHLON', 'GATORADE', 'DREAM11', 'LI-NING'
+];
+
+export default function SponsorsTicker() {
+  return (
+    <div className="py-8 border-y border-white/10 bg-black/60 overflow-hidden relative">
+      <div className="text-center text-[10px] font-mono font-black text-[#00FF66] tracking-[0.3em] uppercase mb-4">
+        • OFFICIAL ARENA PARTNERS & SPONSORS •
+      </div>
+
+      <div className="flex whitespace-nowrap overflow-hidden">
+        <motion.div
+          animate={{ x: ['0%', '-50%'] }}
+          transition={{ repeat: Infinity, duration: 20, ease: 'linear' }}
+          className="flex items-center gap-16 text-xl font-black text-white tracking-wider uppercase italic shrink-0"
+        >
+          {[...SPONSORS, ...SPONSORS].map((sponsor, index) => (
+            <span key={index} className="hover:text-[#00FF66] transition-colors cursor-pointer flex items-center gap-4">
+              <span>{sponsor}</span>
+              <span className="text-[#00FF66] text-xs">★</span>
+            </span>
+          ))}
+        </motion.div>
+      </div>
+    </div>
+  );
+}

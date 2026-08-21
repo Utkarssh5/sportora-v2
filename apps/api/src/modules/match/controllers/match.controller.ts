@@ -99,6 +99,33 @@ export const updateScore = async (
       });
     }
 
+    if (
+      error.message === "Match has already been completed." ||
+      error.message ===
+        "A winner is required when completing a match." ||
+      error.message ===
+        "Both players must be assigned before completing a match." ||
+      error.message ===
+        "Winner must be a real player in the match." ||
+      error.message ===
+        "Winner must be one of the teams in the match." ||
+      error.message ===
+        "BYE matches are completed automatically and cannot be scored manually." ||
+      error.message ===
+        "Next match could not be found for winner advancement." ||
+      error.message ===
+        "Next match already has two teams assigned." ||
+      error.message ===
+        "Tournament not found for match." ||
+      error.message ===
+        "Matches cannot be updated after the tournament has ended."
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
     next(error);
   }
 };

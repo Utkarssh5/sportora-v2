@@ -1,0 +1,670 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Trophy,
+  ShieldCheck,
+  Award,
+  Activity,
+  MapPin,
+  CheckCircle2,
+  Flame,
+} from 'lucide-react';
+import Navbar from '../../components/Navbar';
+
+interface Profile {
+  _id?: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  city?: string;
+  state?: string;
+}
+
+interface Tournament {
+  _id: string;
+  title: string;
+  sport: string;
+  format: string;
+  type: string;
+  city: string;
+  state: string;
+  locationName: string;
+  startDate: string;
+  endDate: string;
+  entryFee: number;
+  prizePool: number;
+  maxParticipants: number;
+  registeredParticipants: number;
+  status: string;
+}
+
+interface Registration {
+  _id: string;
+  status: string;
+  registeredAt: string;
+  paymentStatus?: string | null;
+  tournamentId: Tournament;
+}
+
+export default function ProfilePage() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [registrationsLoading, setRegistrationsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [registrationsError, setRegistrationsError] = useState('');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      try {
+        const response = await fetch('/api/user/profile', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Unable to load profile');
+        }
+
+        if (mounted) {
+          setProfile(data.profile);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load profile',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRegistrations() {
+      try {
+        const response = await fetch(
+          '/api/tournament-registration/my',
+          {
+            credentials: 'include',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Unable to load tournament registrations',
+          );
+        }
+
+        if (mounted) {
+          setRegistrations(data.registrations ?? []);
+        }
+      } catch (err) {
+        if (mounted) {
+          setRegistrationsError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load tournament registrations',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setRegistrationsLoading(false);
+        }
+      }
+    }
+
+    loadRegistrations();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const displayName =
+    profile?.fullName?.trim() || 'SPORTORA PLAYER';
+
+  const roleLabel =
+    profile?.role?.replace(/_/g, ' ') || 'PLAYER';
+
+  const location =
+    profile?.city && profile?.state
+      ? `${profile.city}, ${profile.state}`
+      : 'SPORTORA ARENA';
+
+  async function handleCancelRegistration(
+    registration: Registration,
+  ) {
+    if (registration.paymentStatus === 'SUCCESS' ||
+        registration.paymentStatus === 'REFUNDED') {
+      return;
+    }
+
+    const tournament = registration.tournamentId;
+
+    const now = new Date();
+    const start = new Date(tournament.startDate);
+
+    if (now >= start) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Cancel your registration for "${tournament.title}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancellingId(registration._id);
+      setRegistrationsError('');
+
+      const response = await fetch(
+        `/api/tournament-registration/${registration._id}/cancel`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          cache: 'no-store',
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+          'Failed to cancel registration',
+        );
+      }
+
+      const registrationsResponse = await fetch(
+        '/api/tournament-registration/my',
+        {
+          credentials: 'include',
+          cache: 'no-store',
+        },
+      );
+
+      const registrationsData =
+        await registrationsResponse.json();
+
+      if (!registrationsResponse.ok) {
+        throw new Error(
+          registrationsData.error ||
+          'Registration cancelled, but the list could not be refreshed.',
+        );
+      }
+
+      setRegistrations(
+        registrationsData.registrations ?? [],
+      );
+    } catch (error) {
+      console.error(
+        'Cancel registration error:',
+        error,
+      );
+
+      setRegistrationsError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to cancel registration',
+      );
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  const primarySport =
+    registrations.length > 0
+      ? registrations[0]?.tournamentId?.sport || '—'
+      : '—';
+
+  function getTournamentStatus(
+    registration: Registration,
+  ) {
+    if (registration.status === 'CANCELLED') {
+      return 'CANCELLED';
+    }
+
+    const tournament = registration.tournamentId;
+    const now = new Date();
+    const start = new Date(tournament.startDate);
+    const end = new Date(tournament.endDate);
+
+    if (now < start) {
+      return 'UPCOMING';
+    }
+
+    if (now >= start && now <= end) {
+      return 'ONGOING';
+    }
+
+    return 'COMPLETED';
+  }
+
+  return (
+    <main className="min-h-screen bg-[#080B10] text-white selection:bg-[#00FF66] selection:text-black pt-28 pb-20 px-6">
+      <Navbar />
+
+      <div className="max-w-6xl mx-auto space-y-10">
+
+        {/* HERO PROFILE BANNER */}
+        <div className="clean-glass rounded-[36px] p-8 border border-white/10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#00FF66]/10 rounded-full blur-[120px] pointer-events-none" />
+
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-8 relative z-10">
+
+            {/* Avatar & Verification Badge */}
+            <div className="relative">
+              <div className="w-32 h-32 rounded-3xl border-2 border-[#00FF66] shadow-[0_0_30px_rgba(0,255,102,0.3)] bg-[#00FF66]/10 flex items-center justify-center">
+                <span className="text-4xl font-black text-[#00FF66]">
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+
+              <span className="absolute -bottom-2 -right-2 bg-[#00FF66] text-black p-1.5 rounded-full shadow-lg">
+                <ShieldCheck className="w-5 h-5" />
+              </span>
+            </div>
+
+            {/* User Meta Info */}
+            <div className="flex-1 text-center md:text-left">
+              {loading ? (
+                <>
+                  <div className="h-10 w-64 mx-auto md:mx-0 rounded-lg bg-white/10 animate-pulse" />
+                  <div className="h-4 w-48 mx-auto md:mx-0 rounded bg-white/5 animate-pulse mt-3" />
+                </>
+              ) : error ? (
+                <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-5">
+                  <p className="text-red-300 font-bold">
+                    PROFILE UNAVAILABLE
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {error}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                    <h1 className="text-3xl font-black text-white italic tracking-tight uppercase">
+                      {displayName}
+                    </h1>
+
+                    <span className="bg-[#00FF66]/20 text-[#00FF66] border border-[#00FF66]/40 text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                      {roleLabel}
+                    </span>
+                  </div>
+
+                  <p className="text-gray-400 text-xs mt-2 flex items-center justify-center md:justify-start gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {location}
+                  </p>
+
+                  <p className="text-gray-500 text-xs mt-1">
+                    {profile?.email}
+                  </p>
+                </>
+              )}
+
+              {/* Quick Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                    Matches Played
+                  </span>
+                  <span className="text-2xl font-black text-white mt-1 block">
+                    —
+                  </span>
+                </div>
+
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                    Win Rate
+                  </span>
+                  <span className="text-2xl font-black text-[#00FF66] mt-1 block">
+                    —
+                  </span>
+                </div>
+
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                    Sport
+                  </span>
+                  <span className="text-lg font-black text-cyan-400 mt-1 block">
+                    {primarySport}
+                  </span>
+                </div>
+
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                    Arena Rank
+                  </span>
+                  <span className="text-lg font-black text-amber-400 mt-1 block">
+                    —
+                  </span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ACCOUNT INFORMATION */}
+        {!loading && !error && profile && (
+          <motion.div
+            initial={{ opacity: 0, y: 25 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="clean-glass rounded-3xl border border-white/10 p-6"
+          >
+            <div className="flex items-center gap-2 mb-5">
+              <CheckCircle2 className="w-5 h-5 text-[#00FF66]" />
+              <h2 className="text-xl font-black italic uppercase">
+                ACCOUNT INFORMATION
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                  Full Name
+                </span>
+                <span className="text-sm font-bold mt-1 block">
+                  {profile.fullName || 'Not provided'}
+                </span>
+              </div>
+
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                  Email
+                </span>
+                <span className="text-sm font-bold mt-1 block break-all">
+                  {profile.email || 'Not provided'}
+                </span>
+              </div>
+
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                  Phone
+                </span>
+                <span className="text-sm font-bold mt-1 block">
+                  {profile.phone || 'Not provided'}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* TWO-COLUMN LAYOUT */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* RECENT TOURNAMENT ACTIVITY */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#00FF66]" />
+                RECENT TOURNAMENT PARTICIPATION
+              </h2>
+
+              <span className="text-xs font-mono text-gray-500">
+                LIVE DATA
+              </span>
+            </div>
+
+            {registrationsLoading ? (
+              <div className="clean-glass p-8 rounded-3xl border border-white/10">
+                <div className="h-6 w-64 rounded bg-white/10 animate-pulse" />
+                <div className="h-4 w-40 rounded bg-white/5 animate-pulse mt-4" />
+                <div className="h-20 rounded-2xl bg-white/5 animate-pulse mt-6" />
+              </div>
+            ) : registrationsError ? (
+              <div className="clean-glass p-8 rounded-3xl border border-red-400/20 bg-red-400/5 text-center">
+                <Trophy className="w-10 h-10 text-red-400 mx-auto mb-3" />
+
+                <h3 className="font-black text-white uppercase">
+                  TOURNAMENT DATA UNAVAILABLE
+                </h3>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  {registrationsError}
+                </p>
+              </div>
+            ) : registrations.length === 0 ? (
+              <div className="clean-glass p-8 rounded-3xl border border-white/10 text-center">
+                <Trophy className="w-10 h-10 text-[#00FF66] mx-auto mb-3" />
+
+                <h3 className="font-black text-white uppercase">
+                  No tournament history yet
+                </h3>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  Your tournament registrations and match results will
+                  appear here once you participate in events.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {registrations.map((registration, index) => {
+                  const tournament = registration.tournamentId;
+
+                  const startDate = new Date(
+                    tournament.startDate,
+                  ).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+
+                  const endDate = new Date(
+                    tournament.endDate,
+                  ).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+
+                  return (
+                    <motion.div
+                      key={registration._id}
+                      initial={{ opacity: 0, x: -30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{
+                        duration: 0.5,
+                        delay: index * 0.08,
+                      }}
+                      className="clean-glass p-6 rounded-3xl border border-white/10 relative overflow-hidden group"
+                    >
+                      <div className="absolute -right-16 -top-16 w-40 h-40 rounded-full bg-[#00FF66]/10 blur-3xl group-hover:bg-[#00FF66]/20 transition-all duration-500" />
+
+                      <div className="relative z-10">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-[#00FF66]">
+                                {tournament.sport}
+                              </span>
+
+                              <span className="text-[10px] text-gray-500">
+                                •
+                              </span>
+
+                              <span className="text-[10px] font-mono text-gray-500 uppercase">
+                                {tournament.type}
+                              </span>
+                            </div>
+
+                            <h3 className="text-xl font-black text-white uppercase italic tracking-tight">
+                              {tournament.title}
+                            </h3>
+
+                            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-[#00FF66]" />
+                              {tournament.locationName}, {tournament.city}
+                            </p>
+                          </div>
+
+                          <span className="inline-flex items-center gap-1.5 self-start bg-[#00FF66]/10 text-[#00FF66] border border-[#00FF66]/30 px-3 py-1.5 rounded-full text-[10px] font-black uppercase">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {getTournamentStatus(registration)}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[9px] text-gray-500 uppercase font-black">
+                              Event Date
+                            </p>
+                            <p className="text-xs text-white font-bold mt-1">
+                              {startDate}
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              to {endDate}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[9px] text-gray-500 uppercase font-black">
+                              Format
+                            </p>
+                            <p className="text-xs text-white font-bold mt-1">
+                              {tournament.format}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[9px] text-gray-500 uppercase font-black">
+                              Entry Fee
+                            </p>
+                            <p className="text-xs text-[#00FF66] font-black mt-1">
+                              {tournament.entryFee === 0
+                                ? 'FREE'
+                                : `₹${tournament.entryFee.toLocaleString('en-IN')}`}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[9px] text-gray-500 uppercase font-black">
+                              Prize Pool
+                            </p>
+                            <p className="text-xs text-white font-black mt-1">
+                              ₹{tournament.prizePool.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-[10px] font-mono uppercase">
+                          <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+                            <span className="text-gray-600 block mb-1">
+                              Capacity
+                            </span>
+                            <span className="text-gray-400">
+                              {tournament.registeredParticipants}/
+                              {tournament.maxParticipants} registered
+                            </span>
+                          </div>
+
+                          <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 sm:text-right">
+                            <span className="text-gray-600 block mb-1">
+                              Registered on
+                            </span>
+                            <span className="text-gray-400">
+                              {new Date(
+                                registration.registeredAt,
+                              ).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {registration.status === 'REGISTERED' &&
+                          getTournamentStatus(registration) === 'UPCOMING' &&
+                          registration.paymentStatus !== 'SUCCESS' &&
+                          registration.paymentStatus !== 'REFUNDED' && (
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCancelRegistration(registration)
+                                }
+                                disabled={
+                                  cancellingId === registration._id
+                                }
+                                className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-red-400 transition hover:border-red-500/60 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {cancellingId === registration._id
+                                  ? 'Cancelling...'
+                                  : 'Cancel Registration'}
+                              </button>
+                            </div>
+                          )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ACHIEVEMENTS */}
+          <div className="space-y-6">
+            <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-400" />
+              BADGES & TROPHIES
+            </h2>
+
+            <div className="clean-glass p-6 rounded-3xl border border-white/10">
+
+              <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/10">
+                <div className="w-10 h-10 rounded-xl bg-[#00FF66]/10 text-[#00FF66] flex items-center justify-center shrink-0">
+                  <Flame className="w-5 h-5" />
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-white text-xs">
+                    YOUR JOURNEY STARTS HERE
+                  </h4>
+
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Participate in tournaments to unlock achievements.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  );
+}

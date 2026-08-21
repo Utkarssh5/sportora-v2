@@ -12,6 +12,7 @@ export interface ITournamentRegistration extends Document {
   registeredAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  ticketId?: string;
 }
 
 const TournamentRegistrationSchema =
@@ -38,6 +39,13 @@ const TournamentRegistrationSchema =
       registeredAt: {
         type: Date,
         default: Date.now,
+      },
+
+      ticketId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true,
       },
     },
     {

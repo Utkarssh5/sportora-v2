@@ -1,0 +1,369 @@
+import { tournamentRegistrationRepository } from "../../tournamentRegistration/repositories/tournamentRegistration.repository.js";
+import { tournamentRepository } from "../../tournaments/repositories/tournament.repository.js";
+import { matchRepository } from "../repositories/match.repository.js";
+import {
+  MatchRound,
+  MatchStatus,
+} from "../models/match.model.js";
+
+type FixtureInput = {
+  tournamentId: string;
+  round: MatchRound;
+  matchNumber: number;
+  teamA: string;
+  teamB: string;
+};
+
+class FixtureService {
+  async generateSingleElimination(tournamentId: string) {
+    const tournament =
+      await tournamentRepository.findById(tournamentId);
+
+    if (!tournament) {
+      throw new Error("Tournament not found.");
+    }
+
+    if (tournament.status !== "APPROVED") {
+      throw new Error(
+        "Fixtures can only be generated for approved tournaments."
+      );
+    }
+
+    const registrations =
+      await tournamentRegistrationRepository.findByTournament(
+        tournamentId
+      );
+
+    if (registrations.length < 2) {
+      throw new Error(
+        "At least 2 registered players are required to generate fixtures."
+      );
+    }
+
+    const existingMatches =
+      await matchRepository.findByTournament(tournamentId);
+
+    if (existingMatches.length > 0) {
+      throw new Error(
+        "Fixtures have already been generated for this tournament."
+      );
+    }
+
+    const players = registrations.map((registration) =>
+      registration.userId.toString()
+    );
+
+    const shuffledPlayers = [...players].sort(
+      () => Math.random() - 0.5
+    );
+
+    let bracketSize = 1;
+
+    while (bracketSize < shuffledPlayers.length) {
+      bracketSize *= 2;
+    }
+
+    /*
+     * Build every round first.
+     *
+     * BYE distribution:
+     *
+     * A BYE always belongs to a match that contains
+     * exactly one real player. We never create BYE vs BYE.
+     *
+     * Example: 10 players -> 16-slot bracket
+     *
+     * ROUND 1:
+     *   6 x Player vs BYE
+     *   2 x Player vs Player
+     *
+     * Therefore:
+     *   6 players advance automatically
+     *   4 players actually play ROUND 1
+     */
+    const rounds: FixtureInput[][] = [];
+
+    const firstRoundName =
+      this.getRoundName(bracketSize);
+
+    const openingMatches: FixtureInput[] = [];
+
+    const openingMatchCount = bracketSize / 2;
+    const byeCount = bracketSize - shuffledPlayers.length;
+
+    /*
+     * Randomly select which opening matches receive a BYE.
+     * Never select more BYE matches than opening matches.
+     */
+    const byeMatchIndexes = Array.from(
+      { length: openingMatchCount },
+      (_, index) => index
+    )
+      .sort(() => Math.random() - 0.5)
+      .slice(0, byeCount);
+
+    const byeMatchSet = new Set(byeMatchIndexes);
+
+    let playerIndex = 0;
+    let matchNumber = 1;
+
+    for (let i = 0; i < openingMatchCount; i++) {
+      const getsBye = byeMatchSet.has(i);
+
+      let teamA: string;
+      let teamB: string;
+
+      if (getsBye) {
+        const player = shuffledPlayers[playerIndex];
+
+        if (!player) {
+          throw new Error(
+            "Invalid fixture generation: player missing for BYE."
+          );
+        }
+
+        teamA = player;
+        teamB = "BYE";
+        playerIndex += 1;
+      } else {
+        const playerA = shuffledPlayers[playerIndex];
+        const playerB = shuffledPlayers[playerIndex + 1];
+
+        if (!playerA || !playerB) {
+          throw new Error(
+            "Invalid fixture generation: players missing for opening match."
+          );
+        }
+
+        teamA = playerA;
+        teamB = playerB;
+        playerIndex += 2;
+      }
+
+      openingMatches.push({
+        tournamentId,
+        round: firstRoundName,
+        matchNumber,
+        teamA,
+        teamB,
+      });
+
+      matchNumber++;
+    }
+
+    if (playerIndex !== shuffledPlayers.length) {
+      throw new Error(
+        "Invalid fixture generation: not all players were placed."
+      );
+    }
+
+    rounds.push(openingMatches);
+
+    let currentRoundSize = bracketSize / 2;
+
+    while (currentRoundSize >= 2) {
+      const roundName =
+        this.getRoundName(currentRoundSize);
+
+      const roundMatches: FixtureInput[] = [];
+
+      for (
+        let i = 0;
+        i < currentRoundSize / 2;
+        i++
+      ) {
+        roundMatches.push({
+          tournamentId,
+          round: roundName,
+          matchNumber,
+          teamA: "TBD",
+          teamB: "TBD",
+        });
+
+        matchNumber++;
+      }
+
+      rounds.push(roundMatches);
+
+      currentRoundSize /= 2;
+    }
+
+    /*
+     * Create all Mongo documents first so every
+     * nextMatchId can point to an actual document.
+     */
+    const createdRounds = [];
+
+    for (const round of rounds) {
+      const createdRound = [];
+
+      for (const fixture of round) {
+        const created =
+          await matchRepository.create(fixture);
+
+        createdRound.push(created);
+      }
+
+      createdRounds.push(createdRound);
+    }
+
+    /*
+     * Link every match to the appropriate next-round match.
+     */
+    for (
+      let roundIndex = 0;
+      roundIndex < createdRounds.length - 1;
+      roundIndex++
+    ) {
+      const currentRound =
+        createdRounds[roundIndex];
+
+      const nextRound =
+        createdRounds[roundIndex + 1];
+
+      if (!currentRound || !nextRound) {
+        throw new Error(
+          "Invalid bracket: round could not be determined."
+        );
+      }
+
+      for (
+        let i = 0;
+        i < currentRound.length;
+        i++
+      ) {
+        const currentMatch = currentRound[i];
+
+        const nextMatch =
+          nextRound[Math.floor(i / 2)];
+
+        if (!currentMatch || !nextMatch) {
+          throw new Error(
+            "Invalid bracket: next match could not be determined."
+          );
+        }
+
+        currentMatch.nextMatchId =
+          nextMatch._id;
+
+        await matchRepository.update(
+          currentMatch
+        );
+      }
+    }
+
+    /*
+     * Resolve BYEs.
+     *
+     * BYE matches are CANCELLED rather than COMPLETED,
+     * so they never count as a real played match.
+     *
+     * The real participant is directly advanced into
+     * the linked next-round match.
+     */
+    const openingCreatedMatches =
+      createdRounds[0];
+
+    if (!openingCreatedMatches) {
+      throw new Error(
+        "Invalid bracket: first round could not be determined."
+      );
+    }
+
+    for (
+      const openingMatch of openingCreatedMatches
+    ) {
+      const teamA = openingMatch.teamA;
+      const teamB = openingMatch.teamB;
+
+      if (teamA !== "BYE" && teamB !== "BYE") {
+        continue;
+      }
+
+      const advancingPlayer =
+        teamA !== "BYE"
+          ? teamA
+          : teamB;
+
+      if (
+        !advancingPlayer ||
+        advancingPlayer === "BYE"
+      ) {
+        continue;
+      }
+
+      if (!openingMatch.nextMatchId) {
+        throw new Error(
+          "BYE match has no next match."
+        );
+      }
+
+      openingMatch.status =
+        MatchStatus.CANCELLED;
+
+      await matchRepository.update(
+        openingMatch
+      );
+
+      const nextMatch =
+        await matchRepository.findById(
+          openingMatch.nextMatchId.toString()
+        );
+
+      if (!nextMatch) {
+        throw new Error(
+          "Next match could not be found while resolving BYE."
+        );
+      }
+
+      if (nextMatch.teamA === "TBD") {
+        nextMatch.teamA =
+          advancingPlayer;
+      } else if (nextMatch.teamB === "TBD") {
+        nextMatch.teamB =
+          advancingPlayer;
+      } else if (
+        nextMatch.teamA !== advancingPlayer &&
+        nextMatch.teamB !== advancingPlayer
+      ) {
+        throw new Error(
+          "Next match already contains two different teams."
+        );
+      }
+
+      await matchRepository.update(nextMatch);
+    }
+
+    const createdMatches =
+      createdRounds.flat();
+
+    return {
+      tournamentId,
+      totalPlayers: players.length,
+      bracketSize,
+      totalMatches: createdMatches.length,
+      matches: createdMatches,
+    };
+  }
+
+  private getRoundName(
+    size: number
+  ): MatchRound {
+    switch (size) {
+      case 2:
+        return MatchRound.FINAL;
+
+      case 4:
+        return MatchRound.SEMI_FINAL;
+
+      case 8:
+        return MatchRound.QUARTER_FINAL;
+
+      default:
+        return MatchRound.ROUND_1;
+    }
+  }
+}
+
+export const fixtureService =
+  new FixtureService();

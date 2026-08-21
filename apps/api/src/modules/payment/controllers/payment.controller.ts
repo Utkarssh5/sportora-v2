@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 
 import { paymentService } from "../services/payment.service.js";
+import { env } from "../../../config/env.js";
 
 export const createOrder = async (
   req: Request,
@@ -15,12 +16,34 @@ export const createOrder = async (
       userId: user.id,
     });
 
+    if (!payment) {
+      throw new Error(
+        "Payment order could not be created."
+      );
+    }
+
     return res.status(201).json({
       success: true,
       message: "Payment order created successfully.",
-      data: payment,
+      data: {
+        orderId: payment.orderId,
+        amount: payment.amount,
+        currency: payment.currency,
+        keyId: env.RAZORPAY_KEY_ID,
+        tournamentId: payment.tournamentId,
+      },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (
+      error.message ===
+      "You are already registered for this tournament."
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
     next(error);
   }
 };
@@ -31,7 +54,13 @@ export const verifyPayment = async (
   next: NextFunction
 ) => {
   try {
-    const payment = await paymentService.verifyPayment(req.body);
+    const user = req.user as { id: string };
+
+    const payment =
+      await paymentService.verifyPayment({
+        ...req.body,
+        userId: user.id,
+      });
 
     return res.status(200).json({
       success: true,

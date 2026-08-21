@@ -26,6 +26,11 @@ router.get(
   tournamentRegistrationController.getMyRegistrations
 );
 
+router.get(
+  "/verify/:registrationId",
+  tournamentRegistrationController.verifyRegistration
+);
+
 router.patch(
   "/:registrationId/cancel",
   authMiddleware,

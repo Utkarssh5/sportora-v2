@@ -1,0 +1,261 @@
+export type CompetitionType =
+  | "SINGLES"
+  | "DOUBLES"
+  | "MIXED_DOUBLES"
+  | "TEAM"
+  | "RELAY";
+
+export interface CompetitionRule {
+  type: CompetitionType;
+  participantCount: number;
+  requiresRoster: boolean;
+  defaultPlayingSize?: number;
+  allowsSubstitutes?: boolean;
+  requiresMixedGender?: boolean;
+}
+
+export interface SportCompetitionConfig {
+  sport: string;
+  competitions: CompetitionRule[];
+}
+
+export const SPORT_COMPETITION_CONFIG: SportCompetitionConfig[] = [
+  {
+    sport: "Football",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 11,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Cricket",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 11,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Basketball",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 5,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Volleyball",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 6,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Hockey",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 11,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Badminton",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+      {
+        type: "DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+      },
+      {
+        type: "MIXED_DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+        requiresMixedGender: true,
+      },
+    ],
+  },
+  {
+    sport: "Table Tennis",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+      {
+        type: "DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+      },
+      {
+        type: "MIXED_DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+        requiresMixedGender: true,
+      },
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Tennis",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+      {
+        type: "DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+      },
+      {
+        type: "MIXED_DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+        requiresMixedGender: true,
+      },
+    ],
+  },
+  {
+    sport: "Kabaddi",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 7,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Kho-Kho",
+    competitions: [
+      {
+        type: "TEAM",
+        participantCount: 1,
+        requiresRoster: true,
+        defaultPlayingSize: 9,
+        allowsSubstitutes: true,
+      },
+    ],
+  },
+  {
+    sport: "Pickleball",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+      {
+        type: "DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+      },
+      {
+        type: "MIXED_DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+        requiresMixedGender: true,
+      },
+    ],
+  },
+  {
+    sport: "Squash",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+      {
+        type: "DOUBLES",
+        participantCount: 2,
+        requiresRoster: true,
+      },
+    ],
+  },
+  {
+    sport: "Chess",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+    ],
+  },
+  {
+    sport: "Boxing",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+    ],
+  },
+  {
+    sport: "Wrestling",
+    competitions: [
+      {
+        type: "SINGLES",
+        participantCount: 1,
+        requiresRoster: false,
+      },
+    ],
+  },
+];
+
+export function getSportCompetitionConfig(sport: string) {
+  return SPORT_COMPETITION_CONFIG.find(
+    (item) => item.sport.toLowerCase() === sport.trim().toLowerCase(),
+  );
+}
+
+export function getAllowedCompetitionTypes(sport: string): CompetitionRule[] {
+  return getSportCompetitionConfig(sport)?.competitions ?? [];
+}
+
+export function isCompetitionAllowed(
+  sport: string,
+  competitionType: string,
+): boolean {
+  return getAllowedCompetitionTypes(sport).some(
+    (rule) => rule.type === competitionType,
+  );
+}

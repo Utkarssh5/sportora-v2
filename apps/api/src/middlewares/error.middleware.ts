@@ -34,6 +34,14 @@ export function errorHandler(
     });
   }
 
+  // Payment Gateway Configuration
+  if (err.message === "Payment gateway is not configured.") {
+    return res.status(503).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
   // Default Error
   return res.status(500).json({
     success: false,

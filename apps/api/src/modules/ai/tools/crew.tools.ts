@@ -10,47 +10,41 @@ export const crewTools = {
 
   async registerCrew(
     args: {
-      fullName: string;
       role: string;
       sportsExpertise: string[];
-      city: string;
-      state: string;
+      skills: string[];
       experienceYears: number;
     },
     context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      if (context.user.role !== "CREW") {
+      if (!["PLAYER", "ORGANIZER"].includes(context.user.role)) {
         return {
           success: false,
-          message: "Only crew users can register a crew profile.",
+          message: "Only player or organizer accounts can activate Ground Crew.",
         };
       }
 
-      const crew =
-        await crewService.registerCrew({
-          userId: context.user.id,
-          fullName: args.fullName,
-          role: args.role,
-          sportsExpertise: args.sportsExpertise,
-          city: args.city,
-          state: args.state,
-          experienceYears: args.experienceYears,
-        });
+      const crew = await crewService.registerCrew({
+        userId: context.user.id,
+        role: args.role,
+        sportsExpertise: args.sportsExpertise,
+        skills: args.skills,
+        experienceYears: args.experienceYears,
+      });
 
       return {
         success: true,
         data: crew,
         message:
-          "Successfully registered in the Ground Crew Marketplace.",
+          "Successfully activated the Ground Crew profile.",
       };
-
     } catch (error: any) {
       return {
         success: false,
         message:
           error.message ||
-          "Unable to register crew profile.",
+          "Unable to activate Ground Crew profile.",
       };
     }
   },
@@ -63,11 +57,11 @@ export const crewTools = {
     context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      if (context.user.role !== "CREW") {
+      if (!["PLAYER", "ORGANIZER"].includes(context.user.role)) {
         return {
           success: false,
           message:
-            "Only crew users can update crew availability.",
+            "Only player or organizer accounts can manage Ground Crew availability.",
         };
       }
 

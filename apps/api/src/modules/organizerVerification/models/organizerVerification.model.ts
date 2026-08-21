@@ -8,13 +8,23 @@ export enum VerificationStatus {
 
 export interface IOrganizerVerification extends Document {
   organizer: mongoose.Types.ObjectId;
+
   organizationName: string;
+
+  governmentIdType: string;
   governmentId: string;
   documentUrl: string;
+
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+
   status: VerificationStatus;
   remarks?: string;
   reviewedBy?: mongoose.Types.ObjectId;
   reviewedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +45,12 @@ const OrganizerVerificationSchema =
         trim: true,
       },
 
+      governmentIdType: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
       governmentId: {
         type: String,
         required: true,
@@ -44,6 +60,30 @@ const OrganizerVerificationSchema =
       documentUrl: {
         type: String,
         required: true,
+      },
+
+      address: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      city: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      state: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      pincode: {
+        type: String,
+        required: true,
+        trim: true,
       },
 
       status: {

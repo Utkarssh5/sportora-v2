@@ -9,6 +9,7 @@ export async function connectDatabase() {
 
   try {
     await mongoose.connect(env.MONGODB_URI, {
+      family: 4,
       serverSelectionTimeoutMS: 10000,
     });
 

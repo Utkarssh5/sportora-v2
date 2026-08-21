@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import type { CompetitionType } from '../../sports/config/sport-competition.config.js';
 
 export enum TournamentType {
   SOLO = 'SOLO',
@@ -21,10 +22,20 @@ export interface ITournament extends Document {
   sport: string;
   format: string;
   type: TournamentType;
+  competitionType?: CompetitionType;
+  competitionRules?: {
+    participantCount: number;
+    requiresRoster: boolean;
+    defaultPlayingSize?: number;
+    allowsSubstitutes?: boolean;
+    requiresMixedGender?: boolean;
+  };
   city: string;
   state: string;
   locationName: string;
   pincode: string;
+  latitude?: number;
+  longitude?: number;
   venuePhotos: string[];
   venueVideos: string[];
   permissionDocs: string[];
@@ -48,10 +59,29 @@ const TournamentSchema = new Schema<ITournament>(
     sport: { type: String, required: true },
     format: { type: String, required: true },
     type: { type: String, enum: Object.values(TournamentType), required: true },
+    competitionType: {
+      type: String,
+      enum: [
+        'SINGLES',
+        'DOUBLES',
+        'MIXED_DOUBLES',
+        'TEAM',
+        'RELAY',
+      ],
+    },
+    competitionRules: {
+      participantCount: { type: Number, required: false },
+      requiresRoster: { type: Boolean, required: false },
+      defaultPlayingSize: { type: Number, required: false },
+      allowsSubstitutes: { type: Boolean, required: false },
+      requiresMixedGender: { type: Boolean, required: false },
+    },
     city: { type: String, required: true, index: true },
     state: { type: String, required: true, index: true },
     locationName: { type: String, required: true },
     pincode: { type: String, required: true },
+  latitude: { type: Number },
+  longitude: { type: Number },
     venuePhotos: [{ type: String }],
     venueVideos: [{ type: String }],
     permissionDocs: [{ type: String }],

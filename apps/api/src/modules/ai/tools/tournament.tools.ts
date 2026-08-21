@@ -103,7 +103,8 @@ export const tournamentTools = {
       title: string;
       sport: string;
       format: string;
-      type: string;
+      type?: string;
+      competitionType?: string;
       city: string;
       state: string;
       locationName: string;
@@ -134,7 +135,10 @@ export const tournamentTools = {
           startDate: new Date(args.startDate),
           endDate: new Date(args.endDate),
           registrationDeadline: new Date(args.registrationDeadline),
-          type: args.type as any,
+          ...(args.type ? { type: args.type as any } : {}),
+          ...(args.competitionType
+            ? { competitionType: args.competitionType as any }
+            : {}),
         },
         {
           id: context.user.id,

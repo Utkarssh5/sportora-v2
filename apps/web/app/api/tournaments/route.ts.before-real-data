@@ -1,0 +1,72 @@
+import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongodb';
+import { Tournament } from '@/models/Database';
+import { authorize } from '@/lib/middleware';
+
+// 1. GET / SEARCH TOURNAMENTS (Filters: Sport, City, State, Skill, Price Range, Radius)
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const sport = searchParams.get('sport');
+    const city = searchParams.get('city');
+    const state = searchParams.get('state');
+    const skillLevel = searchParams.get('skillLevel');
+    const maxFee = searchParams.get('maxFee');
+
+    await connectToDatabase();
+    
+    let query: any = {};
+
+    if (sport && sport !== 'All') query.sport = { $regex: sport, $options: 'i' };
+    if (city) query.city = { $regex: city, $options: 'i' };
+    if (state) query.state = { $regex: state, $options: 'i' };
+    if (skillLevel && skillLevel !== 'All') query.skillLevel = skillLevel;
+    if (maxFee) query.entryFee = { $lte: Number(maxFee) };
+
+    const tournaments = await Tournament.find(query).sort({ createdAt: -1 });
+    return NextResponse.json({ success: true, count: tournaments.length, tournaments });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// 2. CREATE TOURNAMENT (Organizer / Admin only)
+export async function POST(req: Request) {
+  const auth = authorize(req, ['organizer', 'admin', 'ORGANIZER', 'ADMIN']);
+  if (!auth.isAuthorized) return auth.response;
+
+  try {
+    const body = await req.json();
+    const { title, sport, city, state, venue, date, entryFee, prizePool, rules, skillLevel, maxTeams } = body;
+
+    if (!title || !sport || !city || !venue || !date || entryFee === undefined || !prizePool) {
+      return NextResponse.json({ error: 'Missing required tournament details' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+    const tournament = await Tournament.create({
+      title,
+      sport,
+      city,
+      state: state || 'UP',
+      venue,
+      date,
+      entryFee: Number(entryFee),
+      prizePool,
+      rules: rules || 'Standard Rules',
+      skillLevel: skillLevel || 'All',
+      maxTeams: maxTeams ? Number(maxTeams) : 16,
+      organizerId: auth.user.userId
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Tournament Created successfully!',
+      tournament
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// 3. UPDATE / DELETE TOURNAMENT (`app/api/tournaments/[id]`)

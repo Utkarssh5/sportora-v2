@@ -17,7 +17,7 @@ class TournamentRegistrationRepository {
     session?: ClientSession
   ) {
     const [registration] =
-      await TournamentRegistration.create([data], { session });
+      await TournamentRegistration.create([data], { session: session ?? null });
 
     return registration;
   }
@@ -25,12 +25,17 @@ class TournamentRegistrationRepository {
 
   async findByTournamentAndUser(
     tournamentId: string,
-    userId: string
+    userId: string,
+    session?: ClientSession
   ) {
-    return await TournamentRegistration.findOne({
-      tournamentId,
-      userId,
-    });
+    return await TournamentRegistration.findOne(
+      {
+        tournamentId,
+        userId,
+      },
+      null,
+      { session: session ?? null }
+    );
   }
 
 
@@ -59,6 +64,16 @@ class TournamentRegistrationRepository {
   }
 
 
+  async findRegisteredByUserWithTournaments(
+    userId: string
+  ) {
+    return await TournamentRegistration.find({
+      userId,
+      status: RegistrationStatus.REGISTERED,
+    }).populate("tournamentId", "title startDate endDate");
+  }
+
+
   async countRegistered(
     tournamentId: string
   ) {
@@ -73,6 +88,38 @@ class TournamentRegistrationRepository {
     id: string
   ) {
     return await TournamentRegistration.findById(id);
+  }
+
+
+  async assignTicketId(
+    id: string,
+    ticketId: string
+  ) {
+    return await TournamentRegistration.findOneAndUpdate(
+      {
+        _id: id,
+        $or: [
+          { ticketId: { $exists: false } },
+          { ticketId: null },
+          { ticketId: "" },
+        ],
+      },
+      {
+        $set: { ticketId },
+      },
+      {
+        new: true,
+      }
+    );
+  }
+
+
+  async findForVerification(
+    id: string
+  ) {
+    return await TournamentRegistration.findById(id)
+      .populate("tournamentId")
+      .populate("userId", "fullName");
   }
 
 
@@ -98,7 +145,8 @@ class TournamentRegistrationRepository {
 
   async reactivate(
     id: string,
-    session?: ClientSession
+    session?: ClientSession,
+    ticketId?: string
   ) {
     return await TournamentRegistration.findOneAndUpdate(
       {
@@ -108,6 +156,7 @@ class TournamentRegistrationRepository {
       {
         status: RegistrationStatus.REGISTERED,
         registeredAt: new Date(),
+        ...(ticketId ? { ticketId } : {}),
       },
       {
         new: true,

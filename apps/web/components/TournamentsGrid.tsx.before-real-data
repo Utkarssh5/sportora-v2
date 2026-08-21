@@ -1,0 +1,769 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import {
+  ShieldCheck,
+  MapPin,
+  Calendar,
+  ArrowUpRight,
+  X,
+  CreditCard,
+  QrCode,
+  User,
+  CheckCircle,
+  CheckCircle2,
+  ArrowRight,
+} from 'lucide-react';
+
+const MOCK_TOURNAMENTS = [
+  {
+    id: '1',
+    title: 'NCR Champions Football Futsal Cup 2026',
+    sport: 'Football',
+    location: 'Turf Park, Sector 29, Gurgaon',
+    date: 'Aug 22 - Aug 25, 2026',
+    timing: '08:00 AM - 08:00 PM',
+    entryFee: '₹1,500',
+    prizePool: '₹1,20,000',
+    squadSize: '5-a-side + 3 Subs',
+    surface: 'Artificial AstroTurf (Turf Shoes)',
+    riskScore: 96,
+    status: 'FILLING FAST',
+    organizer: 'Gurgaon Sports League',
+    description:
+      'Premier 5-a-side futsal tournament with knockout rounds, live video recording, and cash prizes.',
+    rules: [
+      'Turf studs or flat futsal shoes mandatory.',
+      '15-minute halfs with 5-minute break.',
+      'Official match balls provided.',
+    ],
+    imgUrl:
+      'https://images.pexels.com/photos/47730/the-ball-stadion-football-the-pitch-47730.jpeg?auto=compress&cs=tinysrgb&w=800',
+    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
+    icon: '⚽',
+  },
+  {
+    id: '2',
+    title: 'Jaipur Badminton Open Championships 2026',
+    sport: 'Badminton',
+    location: 'SMS Indoor Stadium, Jaipur',
+    date: 'Aug 10 - Aug 12, 2026',
+    timing: '09:00 AM - 06:00 PM',
+    entryFee: '₹800',
+    prizePool: '₹50,000',
+    squadSize: 'Singles / Doubles',
+    surface: 'Wooden Synthetic Court',
+    riskScore: 98,
+    status: 'OPEN',
+    organizer: 'Rajasthan Badminton Association',
+    description:
+      'Open state level badminton championship featuring Men & Women Singles and Doubles categories.',
+    rules: [
+      'Gum sole shoes strictly required.',
+      'Yonex AS-20 Feather shuttles used.',
+      'Best of 3 sets (21 points format).',
+    ],
+    imgUrl:
+      'https://images.pexels.com/photos/3660204/pexels-photo-3660204.jpeg?auto=compress&cs=tinysrgb&w=800',
+    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
+    icon: '🏸',
+  },
+  {
+    id: '3',
+    title: 'Rajasthan Premier T20 Cricket Cup 2026',
+    sport: 'Cricket',
+    location: 'KL Saini Stadium, Jaipur',
+    date: 'Sep 01 - Sep 05, 2026',
+    timing: '07:30 AM - 05:00 PM',
+    entryFee: '₹2,500',
+    prizePool: '₹2,00,000',
+    squadSize: '11 Players + 4 Subs',
+    surface: 'Turf Pitch (Leather Ball)',
+    riskScore: 92,
+    status: 'OPEN',
+    organizer: 'Jaipur Cricket Club',
+    description:
+      'High-octane T20 leather ball cricket cup with digital live scoring and MVP trophies.',
+    rules: [
+      'Full cricket whites / team jersey required.',
+      'Standard T20 ICC rules apply.',
+      'Leather balls provided by organizers.',
+    ],
+    imgUrl:
+      'https://images.pexels.com/photos/3628912/pexels-photo-3628912.jpeg?auto=compress&cs=tinysrgb&w=800',
+    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
+    icon: '🏏',
+  },
+];
+
+interface GridProps {
+  query?: string;
+}
+
+export default function TournamentsGrid({ query = '' }: GridProps) {
+  const [selectedTournament, setSelectedTournament] =
+    useState<(typeof MOCK_TOURNAMENTS)[0] | null>(null);
+
+  const [step, setStep] = useState<
+    'details' | 'form' | 'payment' | 'success'
+  >('details');
+
+  const [formData, setFormData] = useState({
+    playerName: '',
+    phone: '',
+    teamName: '',
+    paymentMethod: 'upi',
+  });
+
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const { scrollYProgress } = useScroll();
+
+  const headerY = useTransform(scrollYProgress, [0.08, 0.35], [70, -20]);
+  const headerOpacity = useTransform(
+    scrollYProgress,
+    [0.08, 0.22],
+    [0.3, 1],
+  );
+
+  const filtered = MOCK_TOURNAMENTS.filter((t) => {
+    const q = query.toLowerCase().trim();
+
+    if (!q) return true;
+
+    return (
+      t.title.toLowerCase().includes(q) ||
+      t.sport.toLowerCase().includes(q) ||
+      t.location.toLowerCase().includes(q)
+    );
+  });
+
+  const handleClose = () => {
+    setSelectedTournament(null);
+    setStep('details');
+    setFormData({
+      playerName: '',
+      phone: '',
+      teamName: '',
+      paymentMethod: 'upi',
+    });
+    setIsProcessing(false);
+  };
+
+  const handlePaymentSubmit = () => {
+    setIsProcessing(true);
+
+    setTimeout(() => {
+      setIsProcessing(false);
+      setStep('success');
+    }, 2000);
+  };
+
+  return (
+    <section
+      id="tournaments"
+      className="relative z-10 mx-auto max-w-7xl overflow-hidden px-6 py-28 sm:py-36"
+    >
+      {/* Background editorial numbers */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-20 top-10 select-none text-[16rem] font-black leading-none tracking-[-0.08em] text-white/[0.025] sm:text-[24rem]"
+      >
+        03
+      </div>
+
+      <motion.div
+        style={{
+          y: headerY,
+          opacity: headerOpacity,
+        }}
+        className="relative z-10 mb-16 flex flex-col justify-between gap-8 lg:flex-row lg:items-end"
+      >
+        <div className="max-w-4xl">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="h-px w-12 bg-[#00ff66]" />
+
+            <span className="text-[10px] font-black tracking-[0.3em] text-[#00ff66]">
+              LIVE DISCOVERY ENGINE
+            </span>
+
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#00ff66] shadow-[0_0_15px_#00ff66]" />
+          </div>
+
+          <h2 className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.05em] text-white sm:text-6xl md:text-7xl">
+            {query ? (
+              <>
+                RESULTS
+                <br />
+                <span className="text-[#00ff66]">
+                  FOR &quot;{query.toUpperCase()}&quot;
+                </span>
+              </>
+            ) : (
+              <>
+                THE NEXT
+                <br />
+                <span className="text-[#00ff66] sportora-text-glow">
+                  BIG GAME.
+                </span>
+              </>
+            )}
+          </h2>
+        </div>
+
+        <div className="max-w-sm border-l border-white/10 pl-5">
+          <p className="text-sm leading-7 text-white/45">
+            Verified tournaments across the sports ecosystem. Pick an event,
+            inspect the arena, and enter the competition.
+          </p>
+
+          <div className="mt-5 flex items-center gap-3 text-[9px] font-bold tracking-[0.25em] text-white/25">
+            <span>DISCOVER</span>
+            <span className="h-px w-8 bg-white/10" />
+            <span>VERIFY</span>
+            <span className="h-px w-8 bg-white/10" />
+            <span>COMPETE</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {filtered.length > 0 ? (
+        <div className="relative">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[#00ff66]/10 to-transparent lg:block"
+          />
+
+          <div className="space-y-8 lg:space-y-16">
+            {filtered.map((item, index) => (
+              <TournamentCard
+                key={item.id}
+                item={item}
+                index={index}
+                onSelect={() => {
+                  setSelectedTournament(item);
+                  setStep('details');
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          className="rounded-[32px] border border-white/10 bg-white/[0.02] px-6 py-20 text-center backdrop-blur-xl"
+        >
+          <div className="text-5xl">⌁</div>
+
+          <p className="mt-5 text-sm font-bold uppercase tracking-wider text-white/50">
+            No tournaments found matching &quot;{query}&quot;.
+          </p>
+        </motion.div>
+      )}
+
+      {/* REGISTRATION / PAYMENT MODAL */}
+      <AnimatePresence>
+        {selectedTournament && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+            onClick={handleClose}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 30, scale: 0.96 }}
+              transition={{ duration: 0.35 }}
+              onClick={(event) => event.stopPropagation()}
+              className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-white/10 bg-[#080B10] p-6 shadow-[0_0_80px_rgba(0,255,102,0.12)] sm:p-8"
+            >
+              <button
+                onClick={handleClose}
+                className="absolute right-5 top-5 z-20 rounded-full border border-white/10 bg-white/5 p-2 text-white/50 transition hover:border-[#00ff66]/40 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              {/* STEP 1 */}
+              {step === 'details' && (
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{selectedTournament.icon}</span>
+
+                    <span className="rounded-full border border-[#00ff66]/40 bg-[#00ff66]/10 px-3 py-1 text-xs font-black uppercase text-[#00ff66]">
+                      {selectedTournament.sport} • {selectedTournament.status}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h2 className="text-2xl font-black uppercase italic tracking-tight text-white sm:text-3xl">
+                      {selectedTournament.title}
+                    </h2>
+
+                    <p className="mt-2 text-xs leading-relaxed text-white/50">
+                      {selectedTournament.description}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs sm:grid-cols-2">
+                    <div>
+                      <div className="font-mono text-[10px] uppercase text-white/30">
+                        VENUE
+                      </div>
+                      <div className="font-bold text-white">
+                        {selectedTournament.location}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="font-mono text-[10px] uppercase text-white/30">
+                        DATES
+                      </div>
+                      <div className="font-bold text-white">
+                        {selectedTournament.date}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#00ff66]">
+                      RULES & REQUIREMENTS
+                    </h4>
+
+                    <ul className="space-y-1 text-xs text-white/50">
+                      {selectedTournament.rules.map((rule, idx) => (
+                        <li key={idx} className="flex items-center gap-2">
+                          <CheckCircle className="h-3.5 w-3.5 shrink-0 text-[#00ff66]" />
+                          <span>{rule}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                    <div>
+                      <div className="text-[10px] uppercase text-white/30">
+                        ENTRY FEE
+                      </div>
+
+                      <div className="text-2xl font-black text-[#00ff66]">
+                        {selectedTournament.entryFee}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setStep('form')}
+                      className="flex items-center gap-2 rounded-full bg-[#00ff66] px-8 py-3.5 text-xs font-extrabold uppercase text-black transition-all hover:bg-emerald-300"
+                    >
+                      PROCEED TO REGISTER
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2 */}
+              {step === 'form' && (
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <h3 className="flex items-center gap-2 text-xl font-black uppercase italic text-white">
+                      <User className="h-5 w-5 text-[#00ff66]" />
+                      REGISTRATION FORM
+                    </h3>
+
+                    <span className="text-xs font-mono text-[#00ff66]">
+                      STEP 1 OF 2
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-mono font-bold uppercase text-white/50">
+                        Captain / Player Name *
+                      </label>
+
+                      <input
+                        type="text"
+                        placeholder="Enter full name"
+                        value={formData.playerName}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            playerName: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[#00ff66]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-mono font-bold uppercase text-white/50">
+                        Phone Number (For WhatsApp Updates) *
+                      </label>
+
+                      <input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={formData.phone}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            phone: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[#00ff66]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-mono font-bold uppercase text-white/50">
+                        Team Name (Optional for Singles)
+                      </label>
+
+                      <input
+                        type="text"
+                        placeholder="e.g. Gurgaon Strikers"
+                        value={formData.teamName}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            teamName: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[#00ff66]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                    <button
+                      onClick={() => setStep('details')}
+                      className="text-xs font-bold uppercase text-white/40 hover:text-white"
+                    >
+                      Back
+                    </button>
+
+                    <button
+                      disabled={!formData.playerName || !formData.phone}
+                      onClick={() => setStep('payment')}
+                      className="flex items-center gap-2 rounded-full bg-[#00ff66] px-8 py-3.5 text-xs font-extrabold uppercase text-black transition-all hover:bg-emerald-300 disabled:opacity-40"
+                    >
+                      CONTINUE TO PAYMENT
+                      <CreditCard className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3 */}
+              {step === 'payment' && (
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <h3 className="flex items-center gap-2 text-xl font-black uppercase italic text-white">
+                      <CreditCard className="h-5 w-5 text-[#00ff66]" />
+                      PAYMENT GATEWAY
+                    </h3>
+
+                    <span className="text-xs font-mono text-[#00ff66]">
+                      STEP 2 OF 2
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div>
+                      <div className="font-mono text-[10px] uppercase text-white/30">
+                        TOTAL AMOUNT PAYABLE
+                      </div>
+
+                      <div className="text-2xl font-black text-[#00ff66]">
+                        {selectedTournament.entryFee}
+                      </div>
+                    </div>
+
+                    <div className="text-right text-xs text-white/50">
+                      <div className="font-bold text-white">
+                        {formData.playerName}
+                      </div>
+
+                      <div>{formData.phone}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-xs font-mono font-bold uppercase text-white/50">
+                      SELECT PAYMENT METHOD
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            paymentMethod: 'upi',
+                          })
+                        }
+                        className={`flex items-center gap-3 rounded-2xl border p-4 transition-all ${
+                          formData.paymentMethod === 'upi'
+                            ? 'border-[#00ff66] bg-[#00ff66]/10 text-white'
+                            : 'border-white/10 bg-white/5 text-white/40'
+                        }`}
+                      >
+                        <QrCode className="h-5 w-5 text-[#00ff66]" />
+                        <span className="text-xs font-bold uppercase">
+                          UPI / QR SCAN
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            paymentMethod: 'card',
+                          })
+                        }
+                        className={`flex items-center gap-3 rounded-2xl border p-4 transition-all ${
+                          formData.paymentMethod === 'card'
+                            ? 'border-[#00ff66] bg-[#00ff66]/10 text-white'
+                            : 'border-white/10 bg-white/5 text-white/40'
+                        }`}
+                      >
+                        <CreditCard className="h-5 w-5 text-[#00ff66]" />
+                        <span className="text-xs font-bold uppercase">
+                          CARD / NETBANKING
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                    <button
+                      onClick={() => setStep('form')}
+                      className="text-xs font-bold uppercase text-white/40 hover:text-white"
+                    >
+                      Back
+                    </button>
+
+                    <button
+                      onClick={handlePaymentSubmit}
+                      disabled={isProcessing}
+                      className="rounded-full bg-[#00ff66] px-8 py-3.5 text-xs font-extrabold uppercase text-black shadow-lg shadow-[#00ff66]/20 transition-all hover:bg-emerald-300"
+                    >
+                      {isProcessing
+                        ? 'PROCESSING PAYMENT...'
+                        : `PAY ${selectedTournament.entryFee} & CONFIRM`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4 */}
+              {step === 'success' && (
+                <div className="relative z-10 space-y-6 py-6 text-center">
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#00ff66] text-black shadow-[0_0_50px_rgba(0,255,102,0.5)]">
+                    <CheckCircle2 className="h-12 w-12" />
+                  </div>
+
+                  <div>
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#00ff66]">
+                      REGISTRATION CONFIRMED!
+                    </span>
+
+                    <h2 className="mt-1 text-3xl font-black uppercase italic text-white">
+                      YOU&apos;RE IN THE ARENA!
+                    </h2>
+
+                    <p className="mx-auto mt-2 max-w-sm text-xs text-white/50">
+                      Confirmation receipt sent to{' '}
+                      <span className="font-bold text-[#00ff66]">
+                        {formData.phone}
+                      </span>
+                      . Match fixture schedule will be shared on WhatsApp.
+                    </p>
+                  </div>
+
+                  <div className="mx-auto max-w-sm space-y-1 rounded-2xl border border-white/10 bg-white/5 p-4 text-left text-xs">
+                    <div className="flex justify-between text-white/40">
+                      <span>Event:</span>
+                      <span className="font-bold text-white">
+                        {selectedTournament.title}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-white/40">
+                      <span>Player Name:</span>
+                      <span className="font-bold text-white">
+                        {formData.playerName}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-white/40">
+                      <span>Amount Paid:</span>
+                      <span className="font-bold text-[#00ff66]">
+                        {selectedTournament.entryFee}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleClose}
+                    className="rounded-full bg-[#00ff66] px-8 py-3.5 text-xs font-extrabold uppercase text-black transition-all hover:bg-emerald-300"
+                  >
+                    RETURN TO ARENA HUB
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function TournamentCard({
+  item,
+  index,
+  onSelect,
+}: {
+  item: (typeof MOCK_TOURNAMENTS)[0];
+  index: number;
+  onSelect: () => void;
+}) {
+  const direction = index % 2 === 0 ? -80 : 80;
+
+  return (
+    <motion.article
+      initial={{
+        opacity: 0,
+        x: direction,
+        y: 40,
+      }}
+      whileInView={{
+        opacity: 1,
+        x: 0,
+        y: 0,
+      }}
+      viewport={{
+        once: true,
+        amount: 0.18,
+      }}
+      transition={{
+        duration: 0.85,
+        delay: index * 0.12,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="group relative"
+    >
+      <div className="absolute -left-1 top-8 hidden text-[9px] font-black tracking-[0.3em] text-white/20 lg:block">
+        EVENT / 0{index + 1}
+      </div>
+
+      <div className="grid overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.025] backdrop-blur-xl transition-all duration-500 group-hover:border-[#00ff66]/30 group-hover:shadow-[0_25px_80px_rgba(0,255,102,0.08)] md:grid-cols-[1.15fr_0.85fr]">
+        <div className="relative h-[300px] overflow-hidden md:h-[430px]">
+          <motion.img
+            src={item.imgUrl}
+            alt={item.title}
+            whileHover={{ scale: 1.08 }}
+            transition={{ duration: 0.8 }}
+            className="h-full w-full object-cover"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-black/10 to-[#080b10]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080b10] via-transparent to-black/30" />
+
+          <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full border border-white/15 bg-black/50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-xl">
+            <span className="text-base">{item.icon}</span>
+            <span className="text-[#00ff66]">{item.sport}</span>
+          </div>
+
+          <div className="absolute right-5 top-5 rounded-full bg-[#00ff66] px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-black shadow-[0_0_20px_rgba(0,255,102,0.25)]">
+            {item.status}
+          </div>
+
+          <div className="absolute bottom-5 left-5">
+            <div className="mb-2 text-[9px] font-bold tracking-[0.25em] text-white/50">
+              VERIFIED EVENT
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-bold text-[#00ff66]">
+              <ShieldCheck className="h-4 w-4" />
+              {item.riskScore}% TRUST SCORE
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col justify-between p-7 sm:p-9">
+          <div>
+            <div className="mb-6 flex items-center justify-between">
+              <span className="text-[9px] font-black tracking-[0.3em] text-white/25">
+                SPORTS / EVENT
+              </span>
+
+              <span className="text-5xl font-black tracking-[-0.08em] text-white/[0.06]">
+                0{index + 1}
+              </span>
+            </div>
+
+            <h3 className="max-w-xl text-3xl font-black uppercase leading-[0.95] tracking-[-0.04em] text-white transition-colors duration-300 group-hover:text-[#00ff66] sm:text-4xl">
+              {item.title}
+            </h3>
+
+            <p className="mt-5 text-sm leading-6 text-white/40">
+              {item.description}
+            </p>
+
+            <div className="mt-7 space-y-3 border-y border-white/10 py-5 text-xs text-white/50">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-4 w-4 shrink-0 text-[#00ff66]" />
+                <span>{item.location}</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Calendar className="h-4 w-4 shrink-0 text-[#00ff66]" />
+                <span>{item.date}</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-[#00ff66]" />
+                <span>{item.squadSize}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 flex items-end justify-between gap-4">
+            <div>
+              <div className="text-[9px] font-black tracking-[0.2em] text-white/25">
+                ENTRY / PRIZE POOL
+              </div>
+
+              <div className="mt-1 flex items-center gap-3">
+                <span className="text-xl font-black text-[#00ff66]">
+                  {item.entryFee}
+                </span>
+
+                <span className="text-xs text-white/30">→</span>
+
+                <span className="text-sm font-bold text-white">
+                  {item.prizePool}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={onSelect}
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white transition-all duration-300 hover:border-[#00ff66] hover:bg-[#00ff66] hover:text-black"
+            >
+              ENTER EVENT
+              <ArrowUpRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </motion.article>
+  );
+}

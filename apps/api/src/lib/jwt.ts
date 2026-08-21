@@ -5,6 +5,7 @@ export interface AccessTokenPayload extends JwtPayload {
   id: string;
   email: string;
   role: UserRole;
+  mustChangePassword?: boolean;
 }
 
 const JWT_SECRET =

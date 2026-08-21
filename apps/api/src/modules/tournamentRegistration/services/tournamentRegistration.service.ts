@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import crypto from "node:crypto";
 
 import {
   RegistrationStatus,
@@ -16,7 +17,25 @@ import {
   tournamentRepository,
 } from "../../tournaments/repositories/tournament.repository.js";
 
+import {
+  paymentRepository,
+} from "../../payment/repositories/payment.repository.js";
+
+import {
+  PaymentStatus,
+} from "../../payment/models/payment.model.js";
+
+import {
+  competitionEntryService,
+} from "../../competitionEntry/services/competitionEntry.service.js";
+
 class TournamentRegistrationService {
+
+  private generateTicketId() {
+    const year = new Date().getFullYear();
+    const token = crypto.randomBytes(4).toString("hex").toUpperCase();
+    return `SPT-${year}-${token}`;
+  }
 
   async register(
     tournamentId: string,
@@ -27,6 +46,12 @@ class TournamentRegistrationService {
 
     if (!tournament) {
       throw new Error("Tournament not found");
+    }
+
+    if (tournament.organizerId.toString() === userId) {
+      throw new Error(
+        "You cannot register for your own tournament"
+      );
     }
 
     if (tournament.status !== "APPROVED") {
@@ -91,19 +116,44 @@ class TournamentRegistrationService {
               "Registration could not be reactivated"
             );
           }
-
-          return;
+        } else {
+          registration =
+            await tournamentRegistrationRepository.create(
+              {
+                tournamentId: tournament._id,
+                userId: userId as any,
+                status: RegistrationStatus.REGISTERED,
+                ticketId: this.generateTicketId(),
+              },
+              session
+            );
         }
 
-        registration =
-          await tournamentRegistrationRepository.create(
-            {
-              tournamentId: tournament._id,
-              userId: userId as any,
-              status: RegistrationStatus.REGISTERED,
-            },
-            session
+        if (!registration) {
+          throw new Error(
+            "Registration could not be created"
           );
+        }
+
+        const competitionType =
+          tournament.competitionType ??
+          (
+            tournament.type === "SOLO"
+              ? "SINGLES"
+              : tournament.type === "DUO"
+                ? "DOUBLES"
+                : "TEAM"
+          );
+
+        await competitionEntryService.ensureForRegistration(
+          {
+            tournamentId: tournament._id.toString(),
+            registrationId: registration._id.toString(),
+            captainId: userId,
+            competitionType,
+          },
+          session
+        );
       });
 
       return registration;
@@ -145,9 +195,120 @@ class TournamentRegistrationService {
   async getMyRegistrations(
     userId: string
   ) {
-    return tournamentRegistrationRepository.findByUser(
-      userId
+    const registrations =
+      await tournamentRegistrationRepository.findByUser(
+        userId
+      );
+
+    return Promise.all(
+      registrations.map(async (registration) => {
+        const payment =
+          await paymentRepository.findByTournamentAndUser(
+            registration.tournamentId._id.toString(),
+            userId
+          );
+
+        let ticketId = registration.ticketId;
+
+        if (!ticketId) {
+          ticketId = this.generateTicketId();
+
+          await tournamentRegistrationRepository.assignTicketId(
+            registration._id.toString(),
+            ticketId
+          );
+        }
+
+        return {
+          ...registration.toObject(),
+          ticketId,
+          paymentStatus: payment?.status ?? null,
+          paymentId: payment?.paymentId ?? null,
+          orderId: payment?.orderId ?? null,
+        };
+      })
     );
+  }
+
+
+  async verifyRegistration(
+    registrationId: string
+  ) {
+    if (!mongoose.Types.ObjectId.isValid(registrationId)) {
+      return {
+        valid: false,
+        message: "Invalid registration ID",
+      };
+    }
+
+    const registration =
+      await tournamentRegistrationRepository.findForVerification(
+        registrationId
+      );
+
+    if (!registration) {
+      return {
+        valid: false,
+        message: "Registration not found",
+      };
+    }
+
+    const tournament = registration.tournamentId as any;
+
+    const payment =
+      await paymentRepository.findByTournamentAndUser(
+        tournament._id.toString(),
+        (registration.userId as any)._id.toString()
+      );
+
+    const paymentStatus = payment?.status ?? null;
+
+    const valid =
+      registration.status === RegistrationStatus.REGISTERED &&
+      paymentStatus === PaymentStatus.SUCCESS;
+
+    const player = registration.userId as any;
+
+    let ticketId = registration.ticketId;
+
+    if (!ticketId) {
+      ticketId = this.generateTicketId();
+
+      await tournamentRegistrationRepository.assignTicketId(
+        registration._id.toString(),
+        ticketId
+      );
+    }
+
+    return {
+      valid,
+      message: valid
+        ? "Valid registration"
+        : "Registration is not valid",
+      registration: {
+        id: registration._id,
+        ticketId,
+        status: registration.status,
+        registeredAt: registration.registeredAt,
+      },
+      player: {
+        fullName: player?.fullName ?? "Player",
+      },
+      tournament: {
+        id: tournament._id,
+        title: tournament.title,
+        sport: tournament.sport,
+        format: tournament.format,
+        startDate: tournament.startDate,
+        endDate: tournament.endDate,
+        locationName: tournament.locationName,
+        city: tournament.city,
+        state: tournament.state,
+      },
+      payment: {
+        status: paymentStatus,
+      },
+    };
   }
 
 
@@ -177,6 +338,24 @@ class TournamentRegistrationService {
     ) {
       throw new Error(
         "Registration is already cancelled"
+      );
+    }
+
+    const payment =
+      await paymentRepository.findByTournamentAndUser(
+        registration.tournamentId.toString(),
+        userId
+      );
+
+    if (
+      payment &&
+      (
+        payment.status === PaymentStatus.SUCCESS ||
+        payment.status === PaymentStatus.REFUNDED
+      )
+    ) {
+      throw new Error(
+        "Registration cannot be cancelled after payment."
       );
     }
 

@@ -10,6 +10,12 @@ export enum MatchStatus {
 export enum MatchRound {
   ROUND_1 = "ROUND_1",
   ROUND_2 = "ROUND_2",
+  ROUND_3 = "ROUND_3",
+  ROUND_4 = "ROUND_4",
+  ROUND_5 = "ROUND_5",
+  ROUND_OF_64 = "ROUND_OF_64",
+  ROUND_OF_32 = "ROUND_OF_32",
+  ROUND_OF_16 = "ROUND_OF_16",
   QUARTER_FINAL = "QUARTER_FINAL",
   SEMI_FINAL = "SEMI_FINAL",
   FINAL = "FINAL",

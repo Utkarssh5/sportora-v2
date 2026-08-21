@@ -46,6 +46,7 @@ export class AuthController {
             fullName: result.user.fullName,
             email: result.user.email,
             role: result.user.role,
+            mustChangePassword: result.user.mustChangePassword,
           },
           accessToken: result.accessToken,
         },

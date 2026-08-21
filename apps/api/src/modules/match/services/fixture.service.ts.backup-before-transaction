@@ -1,0 +1,599 @@
+import { randomInt } from "node:crypto";
+
+import { tournamentRegistrationRepository } from "../../tournamentRegistration/repositories/tournamentRegistration.repository.js";
+import { tournamentRepository } from "../../tournaments/repositories/tournament.repository.js";
+import { matchRepository } from "../repositories/match.repository.js";
+import {
+  MatchRound,
+  MatchStatus,
+} from "../models/match.model.js";
+
+type FixtureInput = {
+  tournamentId: string;
+  round: MatchRound;
+  matchNumber: number;
+  teamA: string;
+  teamB: string;
+};
+
+export type KnockoutBracketPlan = {
+  participantCount: number;
+  bracketSize: number;
+  byeCount: number;
+  openingMatchCount: number;
+  realOpeningMatches: number;
+  totalMatches: number;
+  roundSizes: number[];
+};
+
+export type PlannedKnockoutMatch = {
+  round: MatchRound;
+  matchNumber: number;
+  teamA: string;
+  teamB: string;
+  nextMatchIndex?: number;
+  isBye: boolean;
+};
+
+export type KnockoutFixturePlan = {
+  tournamentId: string;
+  participantCount: number;
+  bracketSize: number;
+  byeCount: number;
+  matches: PlannedKnockoutMatch[];
+};
+
+export function secureShuffle<T>(
+  values: T[]
+): T[] {
+  const shuffled = [...values];
+
+  for (
+    let i = shuffled.length - 1;
+    i > 0;
+    i--
+  ) {
+    const j = randomInt(i + 1);
+
+    const current = shuffled[i];
+
+    if (current === undefined) {
+      throw new Error(
+        "Invalid shuffle state."
+      );
+    }
+
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = current;
+  }
+
+  return shuffled;
+}
+
+export function createKnockoutFixturePlan(
+  tournamentId: string,
+  players: string[]
+): KnockoutFixturePlan {
+  if (
+    players.length < 2 ||
+    players.length > 100
+  ) {
+    throw new Error(
+      "Individual knockout tournaments require between 2 and 100 participants."
+    );
+  }
+
+  const uniquePlayers = new Set(players);
+
+  if (uniquePlayers.size !== players.length) {
+    throw new Error(
+      "Fixture generation received duplicate participants."
+    );
+  }
+
+  let bracketSize = 1;
+
+  while (bracketSize < players.length) {
+    bracketSize *= 2;
+  }
+
+  const shuffledPlayers =
+    secureShuffle(players);
+
+  const openingMatchCount =
+    bracketSize / 2;
+
+  const byeCount =
+    bracketSize - players.length;
+
+  const byeMatchIndexes = new Set(
+    secureShuffle(
+      Array.from(
+        { length: openingMatchCount },
+        (_, index) => index
+      )
+    ).slice(0, byeCount)
+  );
+
+  const matches: PlannedKnockoutMatch[] = [];
+
+  let playerIndex = 0;
+  let matchNumber = 1;
+
+  for (
+    let index = 0;
+    index < openingMatchCount;
+    index++
+  ) {
+    if (byeMatchIndexes.has(index)) {
+      const player =
+        shuffledPlayers[playerIndex++];
+
+      if (!player) {
+        throw new Error(
+          "Fixture generation failed while assigning a BYE."
+        );
+      }
+
+      matches.push({
+        round: getKnockoutRoundName(bracketSize),
+        matchNumber,
+        teamA: player,
+        teamB: "BYE",
+        isBye: true,
+      });
+    } else {
+      const playerA =
+        shuffledPlayers[playerIndex++];
+
+      const playerB =
+        shuffledPlayers[playerIndex++];
+
+      if (!playerA || !playerB) {
+        throw new Error(
+          "Fixture generation failed while assigning opening participants."
+        );
+      }
+
+      matches.push({
+        round: getKnockoutRoundName(bracketSize),
+        matchNumber,
+        teamA: playerA,
+        teamB: playerB,
+        isBye: false,
+      });
+    }
+
+    matchNumber++;
+  }
+
+  if (playerIndex !== shuffledPlayers.length) {
+    throw new Error(
+      "Fixture generation failed: not all participants were assigned."
+    );
+  }
+
+  let currentRoundMatchCount =
+    openingMatchCount;
+
+  let currentRoundStart = 0;
+
+  while (currentRoundMatchCount > 1) {
+    const nextRoundMatchCount =
+      currentRoundMatchCount / 2;
+
+    const nextRoundStart =
+      matches.length;
+
+    for (
+      let index = 0;
+      index < nextRoundMatchCount;
+      index++
+    ) {
+      matches.push({
+        round: getKnockoutRoundName(
+          currentRoundMatchCount
+        ),
+        matchNumber,
+        teamA: "TBD",
+        teamB: "TBD",
+        isBye: false,
+      });
+
+      matchNumber++;
+    }
+
+    for (
+      let index = 0;
+      index < currentRoundMatchCount;
+      index++
+    ) {
+      const currentMatch =
+        matches[
+          currentRoundStart + index
+        ];
+
+      const nextMatchIndex =
+        nextRoundStart +
+        Math.floor(index / 2);
+
+      if (!currentMatch) {
+        throw new Error(
+          "Fixture generation failed: current match missing."
+        );
+      }
+
+      currentMatch.nextMatchIndex =
+        nextMatchIndex;
+    }
+
+    currentRoundStart = nextRoundStart;
+    currentRoundMatchCount =
+      nextRoundMatchCount;
+  }
+
+  return {
+    tournamentId,
+    participantCount: players.length,
+    bracketSize,
+    byeCount,
+    matches,
+  };
+}
+
+function getKnockoutRoundName(
+  size: number
+): MatchRound {
+  switch (size) {
+    case 2:
+      return MatchRound.FINAL;
+
+    case 4:
+      return MatchRound.SEMI_FINAL;
+
+    case 8:
+      return MatchRound.QUARTER_FINAL;
+
+    case 16:
+      return MatchRound.ROUND_OF_16;
+
+    case 32:
+      return MatchRound.ROUND_OF_32;
+
+    case 64:
+      return MatchRound.ROUND_OF_64;
+
+    default:
+      return MatchRound.ROUND_1;
+  }
+}
+
+export function calculateKnockoutBracket(
+  participantCount: number
+): KnockoutBracketPlan {
+  if (
+    !Number.isInteger(participantCount) ||
+    participantCount < 2
+  ) {
+    throw new Error(
+      "Knockout bracket requires at least 2 participants."
+    );
+  }
+
+  if (participantCount > 100) {
+    throw new Error(
+      "Individual knockout tournaments support a maximum of 100 participants."
+    );
+  }
+
+  let bracketSize = 1;
+
+  while (bracketSize < participantCount) {
+    bracketSize *= 2;
+  }
+
+  const openingMatchCount = bracketSize / 2;
+  const byeCount = bracketSize - participantCount;
+  const realOpeningMatches =
+    openingMatchCount - byeCount;
+
+  const roundSizes: number[] = [];
+
+  for (
+    let matchCount = openingMatchCount;
+    matchCount >= 1;
+    matchCount /= 2
+  ) {
+    roundSizes.push(matchCount);
+  }
+
+  return {
+    participantCount,
+    bracketSize,
+    byeCount,
+    openingMatchCount,
+    realOpeningMatches,
+    totalMatches: bracketSize - 1,
+    roundSizes,
+  };
+}
+
+class FixtureService {
+  async generateSingleElimination(tournamentId: string) {
+    const tournament =
+      await tournamentRepository.findById(tournamentId);
+
+    if (!tournament) {
+      throw new Error("Tournament not found.");
+    }
+
+    if (tournament.status !== "APPROVED") {
+      throw new Error(
+        "Fixtures can only be generated for approved tournaments."
+      );
+    }
+
+    if (tournament.type !== "SOLO") {
+      throw new Error(
+        "Individual fixtures can only be generated for SOLO tournaments."
+      );
+    }
+
+    const normalizedFormat =
+      tournament.format.trim().toUpperCase();
+
+    if (normalizedFormat !== "KNOCKOUT") {
+      throw new Error(
+        "Individual fixture generation currently supports only KNOCKOUT format."
+      );
+    }
+
+    if (new Date() <= tournament.registrationDeadline) {
+      throw new Error(
+        "Fixtures can only be generated after the registration deadline."
+      );
+    }
+
+    const registrations =
+      await tournamentRegistrationRepository.findByTournament(
+        tournamentId
+      );
+
+    if (registrations.length < 2) {
+      throw new Error(
+        "At least 2 registered players are required to generate fixtures."
+      );
+    }
+
+    if (registrations.length > 100) {
+      throw new Error(
+        "Individual knockout tournaments support a maximum of 100 registered players."
+      );
+    }
+
+    const existingMatches =
+      await matchRepository.findByTournament(
+        tournamentId
+      );
+
+    if (existingMatches.length > 0) {
+      throw new Error(
+        "Fixtures have already been generated for this tournament."
+      );
+    }
+
+    const players = registrations.map(
+      (registration) =>
+        registration.userId.toString()
+    );
+
+    const plan =
+      createKnockoutFixturePlan(
+        tournamentId,
+        players
+      );
+
+    /*
+     * Create every Match document first.
+     *
+     * The pure planner stores nextMatchIndex values.
+     * MongoDB stores the actual nextMatchId.
+     */
+    const createdMatches = [];
+
+    for (const plannedMatch of plan.matches) {
+      const created =
+        await matchRepository.create({
+          tournamentId,
+          round: plannedMatch.round,
+          matchNumber:
+            plannedMatch.matchNumber,
+          teamA: plannedMatch.teamA,
+          teamB: plannedMatch.teamB,
+        });
+
+      createdMatches.push(created);
+    }
+
+    /*
+     * Link every non-final match to its
+     * actual MongoDB next-round match.
+     */
+    for (
+      let index = 0;
+      index < plan.matches.length;
+      index++
+    ) {
+      const plannedMatch =
+        plan.matches[index];
+
+      const createdMatch =
+        createdMatches[index];
+
+      if (!plannedMatch || !createdMatch) {
+        throw new Error(
+          "Invalid fixture plan: match could not be resolved."
+        );
+      }
+
+      if (
+        plannedMatch.nextMatchIndex ===
+        undefined
+      ) {
+        continue;
+      }
+
+      const nextMatch =
+        createdMatches[
+          plannedMatch.nextMatchIndex
+        ];
+
+      if (!nextMatch) {
+        throw new Error(
+          "Invalid fixture plan: next match could not be resolved."
+        );
+      }
+
+      createdMatch.nextMatchId =
+        nextMatch._id;
+
+      await matchRepository.update(
+        createdMatch
+      );
+    }
+
+    /*
+     * Resolve BYEs.
+     *
+     * BYE matches are CANCELLED rather than
+     * COMPLETED, so they never count as played
+     * matches.
+     *
+     * The real participant is automatically
+     * advanced into the linked next-round match.
+     */
+    for (
+      let index = 0;
+      index < plan.matches.length;
+      index++
+    ) {
+      const plannedMatch =
+        plan.matches[index];
+
+      const createdMatch =
+        createdMatches[index];
+
+      if (
+        !plannedMatch ||
+        !createdMatch ||
+        !plannedMatch.isBye
+      ) {
+        continue;
+      }
+
+      const advancingPlayer =
+        plannedMatch.teamA !== "BYE"
+          ? plannedMatch.teamA
+          : plannedMatch.teamB;
+
+      if (
+        !advancingPlayer ||
+        advancingPlayer === "BYE"
+      ) {
+        throw new Error(
+          "Invalid BYE match: no real participant found."
+        );
+      }
+
+      if (
+        plannedMatch.nextMatchIndex ===
+        undefined
+      ) {
+        throw new Error(
+          "BYE match has no next match."
+        );
+      }
+
+      createdMatch.status =
+        MatchStatus.CANCELLED;
+
+      await matchRepository.update(
+        createdMatch
+      );
+
+      const nextMatch =
+        createdMatches[
+          plannedMatch.nextMatchIndex
+        ];
+
+      if (!nextMatch) {
+        throw new Error(
+          "Next match could not be found while resolving BYE."
+        );
+      }
+
+      if (nextMatch.teamA === "TBD") {
+        nextMatch.teamA =
+          advancingPlayer;
+      } else if (nextMatch.teamB === "TBD") {
+        nextMatch.teamB =
+          advancingPlayer;
+      } else if (
+        nextMatch.teamA !== advancingPlayer &&
+        nextMatch.teamB !== advancingPlayer
+      ) {
+        throw new Error(
+          "Next match already contains two different players."
+        );
+      }
+
+      await matchRepository.update(
+        nextMatch
+      );
+    }
+
+    return {
+      tournamentId,
+      totalPlayers: plan.participantCount,
+      bracketSize: plan.bracketSize,
+      totalMatches: createdMatches.length,
+      matches: createdMatches,
+    };
+  }
+
+  private shufflePlayers<T>(
+    values: T[]
+  ): T[] {
+    return secureShuffle(values);
+  }
+
+  private getRoundName(
+    size: number
+  ): MatchRound {
+    switch (size) {
+      case 2:
+        return MatchRound.FINAL;
+
+      case 4:
+        return MatchRound.SEMI_FINAL;
+
+      case 8:
+        return MatchRound.QUARTER_FINAL;
+
+      case 16:
+        return MatchRound.ROUND_OF_16;
+
+      case 32:
+        return MatchRound.ROUND_OF_32;
+
+      case 64:
+        return MatchRound.ROUND_OF_64;
+
+      default:
+        return MatchRound.ROUND_1;
+    }
+  }
+}
+
+export const fixtureService =
+  new FixtureService();

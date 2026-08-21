@@ -1,0 +1,2830 @@
+'use client';
+
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  Trophy,
+  ShieldCheck,
+  Award,
+  Activity,
+  MapPin,
+  CheckCircle2,
+  Flame,
+  ArrowLeft,
+  Ticket,
+  Pencil,
+  Plus,
+  X,
+  UserRound,
+  Heart,
+  Medal,
+  Settings,
+} from 'lucide-react';
+import QRCode from 'react-qr-code';
+import jsPDF from 'jspdf';
+import QRCodeGenerator from 'qrcode';
+import Navbar from '../../components/Navbar';
+
+interface Profile {
+  _id?: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  city?: string;
+  state?: string;
+  bio?: string;
+  interests?: string[];
+  achievements?: string[];
+  groundCrewAchievements?: {
+    _id: string;
+    assignmentId: string;
+    tournamentId: string;
+    crewId: string;
+    role: string;
+    sport: string;
+    tournamentTitle: string;
+    eventDate: string;
+    city: string;
+    state: string;
+    verifiedAt: string;
+  }[];
+}
+
+interface Tournament {
+  _id: string;
+  title: string;
+  sport: string;
+  format: string;
+  type: string;
+  city: string;
+  state: string;
+  locationName: string;
+  startDate: string;
+  endDate: string;
+  entryFee: number;
+  prizePool: number;
+  maxParticipants: number;
+  registeredParticipants: number;
+  status: string;
+}
+
+interface Registration {
+  _id: string;
+  ticketId?: string;
+  status: string;
+  registeredAt: string;
+  paymentStatus?: string | null;
+  paymentId?: string | null;
+  orderId?: string | null;
+  tournamentId: Tournament;
+}
+
+interface TournamentPerformance {
+  tournamentId: string;
+  title: string;
+  sport: string;
+  format: string;
+  type: string;
+  city: string;
+  state: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  placement: 'CHAMPION' | 'RUNNER_UP' | null;
+}
+
+interface Performance {
+  tournamentsPlayed: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  podiums: number;
+  matchStatsAvailable: boolean;
+  podiumStatsAvailable: boolean;
+  tournamentHistory: TournamentPerformance[];
+}
+
+interface CrewProfile {
+  _id: string;
+  userId: string;
+  fullName: string;
+  role: string;
+  sportsExpertise: string[];
+  skills: string[];
+  city: string;
+  state: string;
+  experienceYears: number;
+  isAvailable: boolean;
+  rating: number;
+}
+
+interface CrewAssignment {
+  _id: string;
+  requirementId?: string;
+  crewId: string | {
+    _id: string;
+    fullName: string;
+    role: string;
+    city: string;
+    state: string;
+  };
+  tournamentId: Tournament | string;
+  eventDate: string;
+  status: string;
+  workStartedAt?: string;
+  workCompletedAt?: string;
+  completionProof?: string[];
+  completionNote?: string;
+  verifiedAt?: string;
+  assignedAt?: string;
+}
+
+function ProfileContent() {
+  const [bioInput, setBioInput] = useState<string>("");
+  const [interestsInput, setInterestsInput] = useState<string>("");
+
+  const navigateWithinProfile = (url: string) => {
+    sessionStorage.setItem(
+      'sportora:profile-scroll',
+      String(window.scrollY),
+    );
+    window.location.href = url;
+  };
+  const searchParams = useSearchParams();
+  const selectedRegistrationId = searchParams.get('registration');
+
+  type ProfileSection =
+    | 'overview'
+    | 'tournaments'
+    | 'performance'
+    | 'achievements'
+    | 'tickets'
+    | 'crew'
+    | 'settings';
+
+  const requestedSection = searchParams.get('section');
+
+  const activeSection: ProfileSection =
+    selectedRegistrationId
+      ? 'tickets'
+      : requestedSection === 'tournaments' ||
+          requestedSection === 'performance' ||
+          requestedSection === 'achievements' ||
+          requestedSection === 'tickets' ||
+          requestedSection === 'crew' ||
+          requestedSection === 'settings'
+        ? requestedSection
+        : 'overview';
+
+  const openProfileSection = (section: ProfileSection) => {
+    if (section === "tickets") {
+      navigateWithinProfile("/profile?section=tickets");
+      return;
+    }
+
+    navigateWithinProfile(
+      section === 'overview'
+        ? '/profile'
+        : `/profile?section=${section}`,
+    );
+  };
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [crewProfile, setCrewProfile] = useState<CrewProfile | null>(null);
+  const [crewProfileLoading, setCrewProfileLoading] = useState(true);
+
+  const [showCrewActivation, setShowCrewActivation] = useState(false);
+  const [crewActivationRole, setCrewActivationRole] = useState('');
+  const [crewActivationSports, setCrewActivationSports] = useState<string[]>([]);
+  const [crewActivationSkills, setCrewActivationSkills] = useState('');
+  const [crewActivationExperience, setCrewActivationExperience] = useState('');
+  const [crewActivationLoading, setCrewActivationLoading] = useState(false);
+  const [crewActivationError, setCrewActivationError] = useState('');
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [registrationsLoading, setRegistrationsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [registrationsError, setRegistrationsError] = useState('');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [performance, setPerformance] =
+    useState<Performance | null>(null);
+  const [performanceLoading, setPerformanceLoading] =
+    useState(true);
+  const [performanceError, setPerformanceError] =
+    useState('');
+
+  const [crewAssignments, setCrewAssignments] =
+    useState<CrewAssignment[]>([]);
+  const [crewAssignmentsLoading, setCrewAssignmentsLoading] =
+    useState(false);
+  const [crewAssignmentsError, setCrewAssignmentsError] =
+    useState('');
+  const [crewCompletionSuccess, setCrewCompletionSuccess] =
+    useState('');
+  const [completionAssignment, setCompletionAssignment] =
+    useState<CrewAssignment | null>(null);
+  const [completionNote, setCompletionNote] = useState('');
+  const [completionProofFiles, setCompletionProofFiles] =
+    useState<File[]>([]);
+  const [completionProofUrls, setCompletionProofUrls] =
+    useState<string[]>([]);
+  const [uploadingCompletionProof, setUploadingCompletionProof] =
+    useState(false);
+  const [submittingCompletion, setSubmittingCompletion] =
+    useState(false);
+
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem(
+      'sportora:profile-scroll',
+    );
+
+    if (!savedScroll) return;
+
+    const scrollY = Number(savedScroll);
+
+    if (!Number.isFinite(scrollY) || scrollY <= 0) {
+      sessionStorage.removeItem('sportora:profile-scroll');
+      return;
+    }
+
+    if (
+      loading ||
+      registrationsLoading ||
+      performanceLoading
+    ) {
+      return;
+    }
+
+    const restoreScroll = () => {
+      window.scrollTo({
+        top: scrollY,
+        left: 0,
+        behavior: 'auto',
+      });
+
+      sessionStorage.removeItem('sportora:profile-scroll');
+    };
+
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        restoreScroll();
+      });
+    });
+
+    const timer = window.setTimeout(
+      restoreScroll,
+      250,
+    );
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [
+    loading,
+    registrationsLoading,
+    performanceLoading,
+  ]);
+
+
+  const [downloadingTicket, setDownloadingTicket] = useState(false);
+  const ticketRef = useRef<HTMLDivElement | null>(null);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState('');
+
+  const [editBio, setEditBio] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+  const [editInterests, setEditInterests] = useState<string[]>([]);
+  const [editAchievements, setEditAchievements] = useState<string[]>([]);
+  const [newInterest, setNewInterest] = useState('');
+  const [newAchievement, setNewAchievement] = useState('');
+
+  const availableInterests = [
+    'Cricket',
+    'Football',
+    'Badminton',
+    'Table Tennis',
+    'Tennis',
+    'Basketball',
+    'Volleyball',
+    'Running',
+    'Fitness',
+    'Swimming',
+    'Cycling',
+    'Athletics',
+  ];
+
+  function openProfileEditor() {
+    setEditBio(profile?.bio || '');
+    setEditCity(profile?.city || '');
+    setEditState(profile?.state || '');
+    setEditInterests(profile?.interests || []);
+    setEditAchievements(profile?.achievements || []);
+    setNewInterest('');
+    setNewAchievement('');
+    setProfileSaveError('');
+    setIsEditingProfile(true);
+  }
+
+  function addInterest(value?: string) {
+    const interest = (value ?? newInterest).trim();
+
+    if (
+      !interest ||
+      editInterests.some(
+        (item) => item.toLowerCase() === interest.toLowerCase(),
+      ) ||
+      editInterests.length >= 10
+    ) {
+      return;
+    }
+
+    setEditInterests((current) => [...current, interest]);
+    setNewInterest('');
+  }
+
+  function removeInterest(interest: string) {
+    setEditInterests((current) =>
+      current.filter((item) => item !== interest),
+    );
+  }
+
+  function addAchievement() {
+    const achievement = newAchievement.trim();
+
+    if (
+      !achievement ||
+      editAchievements.some(
+        (item) =>
+          item.toLowerCase() === achievement.toLowerCase(),
+      ) ||
+      editAchievements.length >= 10
+    ) {
+      return;
+    }
+
+    setEditAchievements((current) => [
+      ...current,
+      achievement,
+    ]);
+
+    setNewAchievement('');
+  }
+
+  function removeAchievement(achievement: string) {
+    setEditAchievements((current) =>
+      current.filter((item) => item !== achievement),
+    );
+  }
+
+  async function handleSaveProfile() {
+    try {
+      setSavingProfile(true);
+      setProfileSaveError('');
+
+      const response = await fetch('/api/user/profile', {
+        method: 'PATCH',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bio: editBio.trim(),
+          city: editCity.trim(),
+          state: editState.trim(),
+          interests: editInterests,
+          achievements: editAchievements,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Unable to update profile',
+        );
+      }
+
+      setProfile(data.profile);
+      setIsEditingProfile(false);
+    } catch (err) {
+      setProfileSaveError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to update profile',
+      );
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      try {
+        const response = await fetch('/api/user/profile', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Unable to load profile');
+        }
+
+        if (mounted) {
+          setProfile(data.profile);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load profile',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    let mounted = true;
+
+    async function loadCrewProfile() {
+      try {
+        setCrewProfileLoading(true);
+
+        const response = await fetch('/api/crew/me', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'Unable to load crew profile',
+          );
+        }
+
+        if (mounted) {
+          setCrewProfile(data.data ?? null);
+        }
+      } catch {
+        if (mounted) {
+          setCrewProfile(null);
+        }
+      } finally {
+        if (mounted) {
+          setCrewProfileLoading(false);
+        }
+      }
+    }
+
+    loadCrewProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, [profile]);
+
+  const handleCrewActivation = async () => {
+    if (!crewActivationRole) {
+      setCrewActivationError('Please select your primary crew role.');
+      return;
+    }
+
+    if (crewActivationSports.length === 0) {
+      setCrewActivationError('Please select at least one sport.');
+      return;
+    }
+
+    const experienceYears = Number(crewActivationExperience);
+
+    if (!Number.isFinite(experienceYears) || experienceYears < 0) {
+      setCrewActivationError('Please enter valid experience in years.');
+      return;
+    }
+
+    const skills = crewActivationSkills
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+
+    setCrewActivationLoading(true);
+    setCrewActivationError('');
+
+    try {
+      const response = await fetch('/api/crew/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          role: crewActivationRole,
+          sportsExpertise: crewActivationSports,
+          skills,
+          experienceYears,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || 'Unable to activate Ground Crew profile.',
+        );
+      }
+
+      setCrewProfile(data.data);
+      setShowCrewActivation(false);
+      setCrewActivationRole('');
+      setCrewActivationSports([]);
+      setCrewActivationSkills('');
+      setCrewActivationExperience('');
+      setCrewActivationError('');
+    } catch (error) {
+      setCrewActivationError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to activate Ground Crew profile.',
+      );
+    } finally {
+      setCrewActivationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!crewProfile) {
+      setCrewAssignments([]);
+      setCrewAssignmentsLoading(false);
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadCrewAssignments() {
+      try {
+        setCrewAssignmentsLoading(true);
+        setCrewAssignmentsError('');
+
+        const response = await fetch(
+          '/api/tournament-crew/my-assignments',
+          {
+            credentials: 'include',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'Unable to load crew assignments',
+          );
+        }
+
+        if (mounted) {
+          setCrewAssignments(
+            Array.isArray(data.data) ? data.data : [],
+          );
+        }
+      } catch (err) {
+        if (mounted) {
+          setCrewAssignmentsError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load crew assignments',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setCrewAssignmentsLoading(false);
+        }
+      }
+    }
+
+    loadCrewAssignments();
+
+    return () => {
+      mounted = false;
+    };
+  }, [crewProfile]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadPerformance() {
+      try {
+        const response = await fetch(
+          '/api/user/performance',
+          {
+            credentials: 'include',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'Unable to load performance',
+          );
+        }
+
+        if (mounted) {
+          setPerformance(data.performance ?? null);
+        }
+      } catch (err) {
+        if (mounted) {
+          setPerformanceError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load performance',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setPerformanceLoading(false);
+        }
+      }
+    }
+
+    loadPerformance();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRegistrations() {
+      try {
+        const response = await fetch(
+          '/api/tournament-registration/my',
+          {
+            credentials: 'include',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Unable to load tournament registrations',
+          );
+        }
+
+        if (mounted) {
+          setRegistrations(data.registrations ?? []);
+        }
+      } catch (err) {
+        if (mounted) {
+          setRegistrationsError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load tournament registrations',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setRegistrationsLoading(false);
+        }
+      }
+    }
+
+    loadRegistrations();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const displayName =
+    profile?.fullName?.trim() || 'SPORTORA PLAYER';
+
+  const roleLabel =
+    profile?.role?.replace(/_/g, ' ') || 'PLAYER';
+
+  const location =
+    profile?.city && profile?.state
+      ? `${profile?.city}, ${profile?.state}`
+      : 'SPORTORA ARENA';
+
+  async function handleStartCrewWork(
+    assignment: CrewAssignment,
+  ) {
+    const tournamentId =
+      typeof assignment.tournamentId === 'object'
+        ? assignment.tournamentId._id
+        : assignment.tournamentId;
+
+    if (!tournamentId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/tournament-crew/${tournamentId}/${assignment._id}/start`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Unable to start crew assignment',
+        );
+      }
+
+      setCrewAssignments((current) =>
+        current.map((item) =>
+          item._id === assignment._id
+            ? {
+                ...item,
+                status: 'WORKING',
+                workStartedAt:
+                  data.data?.workStartedAt ||
+                  new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setCrewAssignmentsError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to start crew assignment',
+      );
+    }
+  }
+
+  async function handleSubmitCrewCompletion() {
+    if (!completionAssignment) {
+      return;
+    }
+
+    const tournamentId =
+      typeof completionAssignment.tournamentId === 'object'
+        ? completionAssignment.tournamentId._id
+        : completionAssignment.tournamentId;
+
+    if (!tournamentId) {
+      return;
+    }
+
+    if (completionProofFiles.length === 0) {
+      setCrewAssignmentsError(
+        'Please attach at least one completion proof before submitting your work.',
+      );
+      return;
+    }
+
+    try {
+      setSubmittingCompletion(true);
+      setCrewAssignmentsError('');
+
+      let proofUrls = completionProofUrls;
+
+      if (proofUrls.length === 0) {
+        setUploadingCompletionProof(true);
+
+        const formData = new FormData();
+
+        completionProofFiles.forEach((file) => {
+          formData.append('files', file);
+        });
+
+        const uploadResponse = await fetch(
+          '/api/tournament-crew/completion-proof',
+          {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          },
+        );
+
+        const uploadData = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadData.success) {
+          throw new Error(
+            uploadData.error ||
+              uploadData.message ||
+              'Unable to upload completion evidence.',
+          );
+        }
+
+        proofUrls = Array.isArray(uploadData.data)
+          ? uploadData.data
+              .map((item: { url?: string }) => item.url)
+              .filter(
+                (url: unknown): url is string =>
+                  typeof url === 'string' && url.length > 0,
+              )
+          : [];
+
+        if (proofUrls.length === 0) {
+          throw new Error(
+            'No completion evidence was uploaded.',
+          );
+        }
+
+        setCompletionProofUrls(proofUrls);
+      }
+
+      const response = await fetch(
+        `/api/tournament-crew/${tournamentId}/${completionAssignment._id}/complete`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            completionNote: completionNote.trim(),
+            completionProof: proofUrls,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Unable to submit crew completion',
+        );
+      }
+
+      setCrewAssignments((current) =>
+        current.map((item) =>
+          item._id === completionAssignment._id
+            ? {
+                ...item,
+                status: 'COMPLETION_SUBMITTED',
+                workCompletedAt:
+                  data.data?.workCompletedAt ||
+                  new Date().toISOString(),
+                completionNote:
+                  data.data?.completionNote ||
+                  completionNote.trim(),
+                completionProof:
+                  data.data?.completionProof ||
+                  proofUrls,
+              }
+            : item,
+        ),
+      );
+
+      setCompletionAssignment(null);
+      setCompletionNote('');
+      setCompletionProofFiles([]);
+      setCompletionProofUrls([]);
+      setCrewCompletionSuccess(
+        'Completion submitted successfully. Your work is now pending organizer verification.',
+      );
+
+      window.setTimeout(() => {
+        setCrewCompletionSuccess('');
+      }, 5000);
+    } catch (err) {
+      setCrewAssignmentsError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to submit crew completion',
+      );
+    } finally {
+      setUploadingCompletionProof(false);
+      setSubmittingCompletion(false);
+    }
+  }
+
+  async function handleCancelRegistration(
+    registration: Registration,
+  ) {
+    if (registration.paymentStatus === 'SUCCESS' ||
+        registration.paymentStatus === 'REFUNDED') {
+      return;
+    }
+
+    const tournament = registration.tournamentId;
+
+    const now = new Date();
+    const start = new Date(tournament.startDate);
+
+    if (now >= start) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Cancel your registration for "${tournament.title}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancellingId(registration._id);
+      setRegistrationsError('');
+
+      const response = await fetch(
+        `/api/tournament-registration/${registration._id}/cancel`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          cache: 'no-store',
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+          'Failed to cancel registration',
+        );
+      }
+
+      const registrationsResponse = await fetch(
+        '/api/tournament-registration/my',
+        {
+          credentials: 'include',
+          cache: 'no-store',
+        },
+      );
+
+      const registrationsData =
+        await registrationsResponse.json();
+
+      if (!registrationsResponse.ok) {
+        throw new Error(
+          registrationsData.error ||
+          'Registration cancelled, but the list could not be refreshed.',
+        );
+      }
+
+      setRegistrations(
+        registrationsData.registrations ?? [],
+      );
+    } catch (error) {
+      console.error(
+        'Cancel registration error:',
+        error,
+      );
+
+      setRegistrationsError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to cancel registration',
+      );
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  const primarySport =
+    registrations.length > 0
+      ? registrations[0]?.tournamentId?.sport || ''
+      : '';
+
+  async function handleDownloadTicket() {
+    if (!selectedRegistration) return;
+
+    try {
+      setDownloadingTicket(true);
+
+      const tournament = selectedRegistration.tournamentId;
+
+      const verificationUrl =
+        `${window.location.origin}/verify/registration/${selectedRegistration._id}`;
+
+      const qrDataUrl = await QRCodeGenerator.toDataURL(
+        verificationUrl,
+        {
+          width: 600,
+          margin: 2,
+          errorCorrectionLevel: 'H',
+        },
+      );
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const margin = 14;
+
+      /*
+       * Background
+       */
+      pdf.setFillColor(5, 5, 5);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+      /*
+       * Header
+       */
+      pdf.setFillColor(0, 255, 102);
+      pdf.rect(0, 0, pageWidth, 7, 'F');
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(24);
+      pdf.text('SPORTORA', margin, 25);
+
+      pdf.setTextColor(150, 150, 150);
+      pdf.setFontSize(8);
+      pdf.text(
+        'OFFICIAL TOURNAMENT MATCH PASS',
+        margin,
+        32,
+      );
+
+      /*
+       * Valid / Paid status
+       */
+      const statusX = pageWidth - margin - 43;
+      const statusY = 18;
+
+      pdf.setFillColor(0, 45, 25);
+      pdf.roundedRect(
+        statusX,
+        statusY,
+        43,
+        15,
+        3,
+        3,
+        'F',
+      );
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFontSize(8);
+      pdf.text(' VALID / PAID', statusX + 6, statusY + 9);
+
+      /*
+       * Main tournament card
+       */
+      const cardY = 42;
+      const cardH = 72;
+
+      pdf.setFillColor(12, 12, 12);
+      pdf.roundedRect(
+        margin,
+        cardY,
+        pageWidth - margin * 2,
+        cardH,
+        5,
+        5,
+        'F',
+      );
+
+      pdf.setDrawColor(0, 255, 102);
+      pdf.setLineWidth(0.4);
+      pdf.roundedRect(
+        margin,
+        cardY,
+        pageWidth - margin * 2,
+        cardH,
+        5,
+        5,
+        'S',
+      );
+
+      pdf.setTextColor(110, 110, 110);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7);
+      pdf.text('TOURNAMENT', margin + 8, cardY + 12);
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(20);
+
+      const title =
+        tournament.title.length > 34
+          ? `${tournament.title.substring(0, 34)}...`
+          : tournament.title;
+
+      pdf.text(title, margin + 8, cardY + 24);
+
+      /*
+       * Sport / Format
+       */
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFontSize(9);
+      pdf.text(
+        `${tournament.sport.toUpperCase()}    ${tournament.format.toUpperCase()}`,
+        margin + 8,
+        cardY + 34,
+      );
+
+      /*
+       * Event date
+       */
+      const eventDate = new Date(
+        tournament.startDate,
+      ).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      pdf.setTextColor(130, 130, 130);
+      pdf.setFontSize(7);
+      pdf.text('EVENT DATE', margin + 8, cardY + 47);
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10);
+      pdf.text(eventDate, margin + 8, cardY + 55);
+
+      /*
+       * Venue
+       */
+      const venueX = margin + 75;
+
+      pdf.setTextColor(130, 130, 130);
+      pdf.setFontSize(7);
+      pdf.text('VENUE', venueX, cardY + 47);
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+
+      const venue =
+        tournament.locationName.length > 30
+          ? `${tournament.locationName.substring(0, 30)}...`
+          : tournament.locationName;
+
+      pdf.text(venue, venueX, cardY + 55);
+
+      pdf.setTextColor(130, 130, 130);
+      pdf.setFontSize(7);
+      pdf.text(
+        `${tournament.city}, ${tournament.state}`,
+        venueX,
+        cardY + 63,
+      );
+
+      /*
+       * Player section
+       */
+      const playerY = 126;
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFontSize(9);
+      pdf.text('PLAYER INFORMATION', margin, playerY);
+
+      pdf.setDrawColor(45, 45, 45);
+      pdf.line(
+        margin,
+        playerY + 4,
+        pageWidth - margin,
+        playerY + 4,
+      );
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text('PLAYER', margin, playerY + 16);
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(13);
+      pdf.text(
+        profile?.fullName || 'Player',
+        margin,
+        playerY + 25,
+      );
+
+      /*
+       * Registration information
+       */
+      const infoY = playerY + 42;
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text('REGISTRATION ID', margin, infoY);
+
+      pdf.setTextColor(220, 220, 220);
+      pdf.setFontSize(8);
+      pdf.text(
+        selectedRegistration._id,
+        margin,
+        infoY + 9,
+      );
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text(
+        'REGISTRATION STATUS',
+        margin + 82,
+        infoY,
+      );
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFontSize(8);
+      pdf.text(
+        selectedRegistration.status,
+        margin + 82,
+        infoY + 9,
+      );
+
+      /*
+       * Payment information
+       */
+      const paymentY = infoY + 28;
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text('AMOUNT PAID', margin, paymentY);
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(12);
+
+      const amount =
+        selectedRegistration.paymentId &&
+        selectedRegistration.paymentStatus === 'SUCCESS'
+          ? `INR ${tournament.entryFee}`
+          : 'INR 0';
+
+      pdf.text(amount, margin, paymentY + 10);
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text(
+        'PAYMENT STATUS',
+        margin + 82,
+        paymentY,
+      );
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFontSize(8);
+      pdf.text(
+        selectedRegistration.paymentStatus || 'PENDING',
+        margin + 82,
+        paymentY + 10,
+      );
+
+      /*
+       * QR section
+       */
+      const qrBoxX = pageWidth - margin - 58;
+      const qrBoxY = 174;
+      const qrBoxSize = 58;
+
+      pdf.setFillColor(255, 255, 255);
+      pdf.roundedRect(
+        qrBoxX,
+        qrBoxY,
+        qrBoxSize,
+        qrBoxSize,
+        4,
+        4,
+        'F',
+      );
+
+      pdf.addImage(
+        qrDataUrl,
+        'PNG',
+        qrBoxX + 5,
+        qrBoxY + 5,
+        48,
+        48,
+      );
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFontSize(7);
+      pdf.text(
+        'SCAN TO VERIFY',
+        qrBoxX + 7,
+        qrBoxY + qrBoxSize + 7,
+      );
+
+      /*
+       * Payment IDs
+       */
+      const paymentInfoY = 184;
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text('RAZORPAY PAYMENT ID', margin, paymentInfoY);
+
+      pdf.setTextColor(210, 210, 210);
+      pdf.setFontSize(6.5);
+
+      const paymentId =
+        selectedRegistration.paymentId || 'N/A';
+
+      pdf.text(
+        paymentId.length > 32
+          ? `${paymentId.substring(0, 32)}...`
+          : paymentId,
+        margin,
+        paymentInfoY + 9,
+      );
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFontSize(7);
+      pdf.text(
+        'RAZORPAY ORDER ID',
+        margin,
+        paymentInfoY + 25,
+      );
+
+      pdf.setTextColor(210, 210, 210);
+      pdf.text(
+        selectedRegistration.orderId || 'N/A',
+        margin,
+        paymentInfoY + 34,
+      );
+
+      /*
+       * Verification message
+       */
+      const verifyY = 244;
+
+      pdf.setFillColor(0, 35, 20);
+      pdf.roundedRect(
+        margin,
+        verifyY,
+        pageWidth - margin * 2,
+        25,
+        4,
+        4,
+        'F',
+      );
+
+      pdf.setDrawColor(0, 255, 102);
+      pdf.setLineWidth(0.3);
+      pdf.roundedRect(
+        margin,
+        verifyY,
+        pageWidth - margin * 2,
+        25,
+        4,
+        4,
+        'S',
+      );
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.text(
+        ' PRESENT THIS MATCH PASS AT THE VENUE',
+        margin + 8,
+        verifyY + 10,
+      );
+
+      pdf.setTextColor(160, 160, 160);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.text(
+        'QR code links to Sportora registration verification.',
+        margin + 8,
+        verifyY + 18,
+      );
+
+      /*
+       * Footer
+       */
+      pdf.setDrawColor(40, 40, 40);
+      pdf.line(
+        margin,
+        pageHeight - 25,
+        pageWidth - margin,
+        pageHeight - 25,
+      );
+
+      pdf.setTextColor(0, 255, 102);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.text('SPORTORA', margin, pageHeight - 15);
+
+      pdf.setTextColor(100, 100, 100);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6);
+      pdf.text(
+        'Smart Sports Tournament Platform',
+        margin,
+        pageHeight - 9,
+      );
+
+      pdf.text(
+        'OFFICIAL MATCH PASS',
+        pageWidth - margin - 35,
+        pageHeight - 12,
+      );
+
+      /*
+       * Save
+       */
+      const safeTitle =
+        tournament.title
+          .replace(/[^a-z0-9]+/gi, '-')
+          .replace(/^-+|-+$/g, '')
+          .toLowerCase() || 'sportora-ticket';
+
+      pdf.save(
+        `sportora-${safeTitle}-match-pass.pdf`,
+      );
+    } catch (error) {
+      console.error(
+        'Ticket PDF generation failed:',
+        error,
+      );
+
+      window.alert(
+        'Unable to generate match pass. Please try again.',
+      );
+    } finally {
+      setDownloadingTicket(false);
+    }
+  }
+
+  const selectedRegistration = selectedRegistrationId
+    ? registrations.find(
+        (registration) =>
+          registration._id === selectedRegistrationId,
+      )
+    : null;
+
+  function getTournamentStatus(
+    registration: Registration,
+  ) {
+    if (registration.status === 'CANCELLED') {
+      return 'CANCELLED';
+    }
+
+    const tournament = registration.tournamentId;
+
+    // A tournament with recorded match results is already completed,
+    // even if its scheduled dates are still in the future.
+    const hasCompletedResults =
+      performance?.tournamentHistory?.some(
+        (result) =>
+          result.tournamentId === tournament._id &&
+          (result.matchesPlayed > 0 || result.placement !== null),
+      ) ?? false;
+
+    if (hasCompletedResults) {
+      return 'COMPLETED';
+    }
+
+    const now = new Date();
+    const start = new Date(tournament.startDate);
+    const end = new Date(tournament.endDate);
+
+    if (now < start) {
+      return 'UPCOMING';
+    }
+
+    if (now >= start && now <= end) {
+      return 'ONGOING';
+    }
+
+    return 'COMPLETED';
+  }
+
+  return (
+    <div className="lg:col-span-3 w-full min-w-0 space-y-6">
+      <Navbar />
+
+      <div className="w-full max-w-[1400px] mx-auto space-y-10 pt-14">
+
+        {/* HERO PROFILE BANNER */}
+        <div className="relative mb-8 overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-b from-[#0e1622]/90 via-[#0a0f16]/95 to-[#06080c] p-6 md:p-8 shadow-[0_0_50px_rgba(0,255,102,0.06)] backdrop-blur-2xl transition-all duration-300 hover:border-[#00FF66]/20">
+          
+          {/* Cyber ambient glows */}
+          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#00FF66]/15 blur-[90px] pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-[90px] pointer-events-none" />
+          <div className="absolute top-0 right-1/4 h-32 w-96 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent transform -skew-x-12 pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col gap-8">
+            
+            {/* Top Row: Avatar + Info + Action */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                
+                {/* Pro Avatar Box */}
+                <div className="relative group shrink-0">
+                  <div className="relative flex h-24 w-24 sm:h-28 sm:w-28 items-center justify-center rounded-[24px] border-2 border-[#00FF66]/60 bg-gradient-to-br from-[#00FF66]/10 via-[#07130c] to-[#040906] shadow-[0_0_30px_rgba(0,255,102,0.25)] transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-[0_0_40px_rgba(0,255,102,0.4)]">
+                    {(
+                      <span className="text-4xl sm:text-5xl font-black italic tracking-tighter text-[#00FF66] drop-shadow-[0_0_15px_rgba(0,255,102,0.6)]">
+                        {displayName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+
+                    {/* Corner Accent Brackets */}
+                    <div className="absolute top-1.5 left-1.5 w-2 h-2 border-t-2 border-l-2 border-[#00FF66]" />
+                    <div className="absolute bottom-1.5 right-1.5 w-2 h-2 border-b-2 border-r-2 border-[#00FF66]" />
+                  </div>
+
+                  {/* Verified Badge */}
+                  <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-xl border border-[#00FF66]/40 bg-[#00FF66] text-black shadow-[0_0_15px_rgba(0,255,102,0.5)]">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                </div>
+
+                {/* Name & Player Meta */}
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase italic tracking-tight text-white drop-shadow-sm">
+                      {displayName}
+                    </h1>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00FF66]/40 bg-[#00FF66]/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#00FF66] shadow-[0_0_12px_rgba(0,255,102,0.2)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#00FF66] animate-pulse" />
+                      {roleLabel}
+                    </span>
+                    <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-cyan-300">
+                      PRO ATHLETE
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-gray-400">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.03] px-2.5 py-1 border border-white/5">
+                      <MapPin className="h-3.5 w-3.5 text-[#00FF66]" />
+                      {location || "Location not set"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.03] px-2.5 py-1 border border-white/5 font-mono text-gray-300">
+                      {profile?.email || "No email linked"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Edit Profile Action Button */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={openProfileEditor}
+                  className="group inline-flex items-center gap-2 rounded-2xl border border-[#00FF66]/40 bg-[#00FF66]/10 px-5 py-3 text-xs font-black uppercase tracking-wider text-[#00FF66] shadow-[0_0_20px_rgba(0,255,102,0.12)] transition-all duration-200 hover:bg-[#00FF66] hover:text-black hover:shadow-[0_0_30px_rgba(0,255,102,0.35)]"
+                >
+                  <Pencil className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+                  EDIT PROFILE
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom 4-Column Cyber HUD Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t border-white/5">
+              
+              {/* Stat 1: Matches Played */}
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition-all duration-200 hover:border-white/20 hover:bg-white/[0.04]">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-gray-400 block">
+                  MATCHES PLAYED
+                </span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-xl sm:text-2xl font-black italic tracking-tight text-white font-mono">
+                    {registrations.length > 0 ? registrations.length : ""}
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-300 uppercase">OFFICIAL</span>
+                </div>
+              </div>
+
+              {/* Stat 2: Win Rate */}
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition-all duration-200 hover:border-[#00FF66]/30 hover:bg-[#00FF66]/[0.02]">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#00FF66] to-transparent shadow-[0_0_8px_#00FF66]" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-[#00FF66] block">
+                  WIN RATE
+                </span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-xl sm:text-2xl font-black italic tracking-tight text-[#00FF66] font-mono">
+                    
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-300 uppercase">RATIO</span>
+                </div>
+              </div>
+
+              {/* Stat 3: Primary Sport */}
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition-all duration-200 hover:border-cyan-400/30 hover:bg-cyan-400/[0.02]">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_8px_#22d3ee]" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-cyan-400 block">
+                  PRIMARY SPORT
+                </span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-lg sm:text-xl font-black uppercase tracking-tight text-cyan-300 truncate block">
+                    {primarySport || "Badminton"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Stat 4: Arena Rank */}
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition-all duration-200 hover:border-amber-400/30 hover:bg-amber-400/[0.02]">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_8px_#f59e0b]" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-amber-400 block">
+                  ARENA RANK
+                </span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-lg sm:text-xl font-black uppercase tracking-tight text-amber-300 font-mono">
+                    UNRANKED
+                  </span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        {/* PROFILE SIDEBAR + ACTIVE CONTENT */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start w-full">
+          
+          {/* SIDEBAR */}
+          <aside className="lg:sticky lg:top-28">
+            <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#090D14]/80 p-3 shadow-2xl backdrop-blur-2xl transition-all duration-300 hover:border-white/20">
+              
+              {/* Top ambient glow */}
+              <div className="absolute -top-12 -left-12 h-28 w-28 rounded-full bg-[#00FF66]/15 blur-2xl pointer-events-none" />
+
+              {/* Profile identity header */}
+              <div className="relative z-10 mx-1 mb-3 rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.04] to-transparent p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[#00FF66]">
+                    PLAYER IDENTITY
+                  </span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#00FF66] animate-pulse" />
+                </div>
+                <p className="mt-1 text-sm font-black uppercase tracking-tight text-white truncate">
+                  {displayName}
+                </p>
+              </div>
+
+              {/* Navigation list */}
+              <nav className="relative z-10 space-y-1.5">
+                {[
+                  { id: "overview" as ProfileSection, label: "Overview", icon: UserRound },
+                  { id: "tournaments" as ProfileSection, label: "My Tournaments", icon: Trophy, count: registrations.length || undefined },
+                  { id: "performance" as ProfileSection, label: "Performance", icon: Activity },
+                  { id: "achievements" as ProfileSection, label: "Achievements", icon: Award },
+                  { id: "tickets" as ProfileSection, label: "My Tickets", icon: Ticket, count: registrations.length || undefined },
+                  { id: "crew" as ProfileSection, label: "Ground Crew", icon: ShieldCheck },
+                  { id: "settings" as ProfileSection, label: "Settings", icon: Settings },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const active = activeSection === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => openProfileSection(item.id)}
+                      className={[
+                        "group relative w-full flex items-center justify-between rounded-2xl px-3.5 py-3 text-left transition-all duration-200",
+                        active
+                          ? "bg-gradient-to-r from-[#00FF66]/15 via-[#00FF66]/5 to-transparent text-white border border-[#00FF66]/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_0_20px_rgba(0,255,102,0.12)] font-black translate-x-1"
+                          : "border border-transparent text-gray-400 hover:text-gray-100 hover:bg-white/[0.04] hover:border-white/5",
+                      ].join(" ")}
+                    >
+                      {/* Active indicator bar */}
+                      {active && (
+                        <div className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[#00FF66] shadow-[0_0_10px_#00FF66]" />
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={[
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
+                            active
+                              ? "bg-[#00FF66] text-black shadow-[0_0_12px_rgba(0,255,102,0.4)]"
+                              : "bg-white/5 text-gray-400 group-hover:bg-white/10 group-hover:text-white",
+                          ].join(" ")}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="text-[11px] font-black uppercase tracking-wider">
+                          {item.label}
+                        </span>
+                      </div>
+
+                      {item.count !== undefined && item.count > 0 && (
+                        <span
+                          className={[
+                            "rounded-full px-2 py-0.5 text-[11px] font-black tracking-tight",
+                            active
+                              ? "bg-[#00FF66]/20 text-[#00FF66] border border-[#00FF66]/30"
+                              : "bg-white/5 text-gray-300 group-hover:text-gray-300",
+                          ].join(" ")}
+                        >
+                          {item.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </aside>
+
+          {/* MAIN CONTENT AREA */}
+          <div className="lg:col-span-3 w-full space-y-6">
+            
+            {/* OVERVIEW SECTION */}
+            {activeSection === 'overview' && (
+            <div className="space-y-6 w-full">
+              
+              {/* TOP ROW: 2 CARDS SIDE BY SIDE */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                
+                {/* ABOUT ME */}
+                <div className="clean-glass rounded-3xl border border-white/10 p-6 md:p-8 relative flex flex-col justify-between w-full">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00FF66]/10 text-[#00FF66]">
+                          <UserRound className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-base font-black italic uppercase tracking-wider text-white">
+                          ABOUT ME
+                        </h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={openProfileEditor}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-black uppercase text-gray-300 transition hover:border-[#00FF66]/40 hover:text-[#00FF66]"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        EDIT
+                      </button>
+                    </div>
+
+                    <p className="text-sm md:text-base leading-relaxed text-gray-300">
+                      {profile?.bio || "Passionate sports player building my journey one tournament at a time."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* SPORTS & INTERESTS */}
+                <div className="clean-glass rounded-3xl border border-white/10 p-6 md:p-8 relative flex flex-col justify-between w-full">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pink-500/10 text-pink-400">
+                          <Heart className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-base font-black italic uppercase tracking-wider text-white">
+                          SPORTS & INTERESTS
+                        </h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={openProfileEditor}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-black uppercase text-gray-300 transition hover:border-[#00FF66]/40 hover:text-[#00FF66]"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        EDIT
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {profile?.interests && profile?.interests.length > 0 ? (
+                        profile?.interests.map((interest) => (
+                          <span
+                            key={interest}
+                            className="rounded-full border border-[#00FF66]/30 bg-[#00FF66]/10 px-4 py-1.5 text-xs font-black uppercase tracking-wider text-[#00FF66]"
+                          >
+                            {interest}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-full border border-[#00FF66]/30 bg-[#00FF66]/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-[#00FF66]">
+                          CRICKET
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* BOTTOM ROW: PROFILE COMPLETION FULL WIDTH */}
+              <div className="clean-glass rounded-3xl border border-white/10 p-6 md:p-8 relative w-full">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-base font-black italic uppercase tracking-wider text-white">
+                      PROFILE COMPLETION
+                    </h2>
+                  </div>
+
+                  <span className="text-sm font-black text-[#00FF66]">100%</span>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-[#00FF66] shadow-[0_0_12px_#00FF66]"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  <p className="text-xs text-gray-400">
+                    Add your interests and achievements to make your profile stand out.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* GROUND CREW WORK */}
+          {activeSection === 'crew' && crewProfile && (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="clean-glass rounded-3xl border border-white/10 p-6 lg:col-span-3"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                      <h2 className="text-xl font-black italic uppercase">
+                        GROUND CREW WORK
+                      </h2>
+                    </div>
+                    <p className="text-sm font-medium text-gray-300 tracking-wide mt-1.5">
+                      Your assigned tournament ground crew work
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigateWithinProfile('/crew/profile')}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#00FF66]/30 bg-[#00FF66]/5 px-4 py-2 text-[9px] font-black uppercase tracking-wider text-[#00FF66] transition hover:bg-[#00FF66]/10"
+                    >
+                      <UserRound className="h-3.5 w-3.5" />
+                      View Crew Profile
+                    </button>
+
+                    {!crewAssignmentsLoading &&
+                      crewAssignments.length > 0 && (
+                        <span className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3.5 py-2 text-xs font-black uppercase tracking-wide text-cyan-200">
+                          {crewAssignments.length} ASSIGNMENT
+                          {crewAssignments.length !== 1 ? 'S' : ''}
+                        </span>
+                      )}
+                  </div>
+                </div>
+
+                {crewCompletionSuccess && (
+                  <div className="mb-5 rounded-2xl border border-[#00FF66]/20 bg-[#00FF66]/5 px-4 py-3">
+                    <p className="text-sm font-bold text-[#00FF66]">
+                      COMPLETION SUBMITTED
+                    </p>
+                    <p className="mt-1 text-xs font-medium leading-relaxed text-gray-300">
+                      {crewCompletionSuccess}
+                    </p>
+                  </div>
+                )}
+
+                {crewAssignmentsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2].map((item) => (
+                      <div
+                        key={item}
+                        className="h-28 rounded-2xl bg-white/5 border border-white/10 animate-pulse"
+                      />
+                    ))}
+                  </div>
+                ) : crewAssignmentsError ? (
+                  <div className="rounded-2xl border border-red-400/20 bg-red-400/5 p-5">
+                    <p className="text-sm font-bold text-red-300">
+                      CREW ASSIGNMENTS UNAVAILABLE
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {crewAssignmentsError}
+                    </p>
+                  </div>
+                ) : crewAssignments.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-7 text-center">
+                    <ShieldCheck className="w-8 h-8 text-gray-600 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-gray-400">
+                      NO CREW ASSIGNMENTS YET
+                    </p>
+                    <p className="text-[10px] text-gray-600 uppercase mt-1">
+                      Assigned tournament work will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {crewAssignments.map((assignment) => {
+                      const tournament =
+                        typeof assignment.tournamentId === 'object'
+                          ? assignment.tournamentId
+                          : null;
+
+                      const crew =
+                        typeof assignment.crewId === 'object'
+                          ? assignment.crewId
+                          : null;
+
+                      const eventDate = new Date(
+                        assignment.eventDate,
+                      );
+
+                      const statusLabel =
+                        assignment.status.replace(/_/g, ' ');
+
+                      return (
+                        <div
+                          key={assignment._id}
+                          className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-lg font-black uppercase tracking-tight text-white">
+                                  {tournament?.title ||
+                                    'Tournament Assignment'}
+                                </h3>
+
+                                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-cyan-200">
+                                  {statusLabel}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                                <div>
+                                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider block mb-1">
+                                    Role
+                                  </span>
+                                  <span className="text-sm font-semibold text-gray-200">
+                                    {crew?.role ||
+                                      'GROUND CREW'}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider block mb-1">
+                                    Event Date
+                                  </span>
+                                  <span className="text-sm font-semibold text-gray-200">
+                                    {Number.isNaN(
+                                      eventDate.getTime(),
+                                    )
+                                      ? '—'
+                                      : eventDate.toLocaleDateString(
+                                          'en-IN',
+                                          {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                          },
+                                        )}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider block mb-1">
+                                    Location
+                                  </span>
+                                  <span className="text-sm font-semibold text-gray-200">
+                                    {tournament?.city ||
+                                      crew?.city ||
+                                      '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0">
+                              {assignment.status === 'ASSIGNED' && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleStartCrewWork(
+                                      assignment,
+                                    )
+                                  }
+                                  className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-wide text-amber-300 transition hover:border-amber-400/40 hover:bg-amber-400/10"
+                                >
+                                  START WORK
+                                </button>
+                              )}
+
+                              {assignment.status === 'WORKING' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCompletionAssignment(
+                                      assignment,
+                                    );
+                                    setCompletionNote(
+                                      assignment.completionNote ||
+                                        '',
+                                    );
+                                    setCompletionProofFiles([]);
+                                    setCompletionProofUrls(
+                                      assignment.completionProof || [],
+                                    );
+                                  }}
+                                  className="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-wide text-cyan-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                                >
+                                  SUBMIT COMPLETION
+                                </button>
+                              )}
+
+                              {assignment.status ===
+                                'COMPLETION_SUBMITTED' && (
+                                <span className="inline-flex items-center rounded-full border border-purple-400/20 bg-purple-400/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-wide text-purple-300">
+                                  VERIFICATION PENDING
+                                </span>
+                              )}
+
+                              {assignment.status ===
+                                'PAYOUT_PENDING' && (
+                                <span className="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-wide text-amber-300">
+                                  PAYOUT PROCESSING
+                                </span>
+                              )}
+
+                              {assignment.status === 'PAID' && (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00FF66]/20 bg-[#00FF66]/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-wide text-[#00FF66]">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  PAID
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-xs font-medium text-gray-400 mt-5 leading-relaxed">
+                  Sportora handles verification and crew payout after
+                  verified event completion.
+                </p>
+              </motion.div>
+          )}
+
+          {activeSection === 'tournaments' && (
+          <div className="lg:col-span-12 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#00FF66]" />
+                RECENT TOURNAMENT PARTICIPATION
+              </h2>
+
+              <span className="text-xs font-mono text-gray-300">
+                LIVE DATA
+              </span>
+            </div>
+
+            {registrationsLoading ? (
+              <div className="clean-glass p-8 rounded-3xl border border-white/10">
+                <div className="h-6 w-64 rounded bg-white/10 animate-pulse" />
+                <div className="h-4 w-40 rounded bg-white/5 animate-pulse mt-4" />
+                <div className="h-20 rounded-2xl bg-white/5 animate-pulse mt-6" />
+              </div>
+            ) : registrationsError ? (
+              <div className="clean-glass p-8 rounded-3xl border border-red-400/20 bg-red-400/5 text-center">
+                <Trophy className="w-10 h-10 text-red-400 mx-auto mb-3" />
+
+                <h3 className="font-black text-white uppercase">
+                  TOURNAMENT DATA UNAVAILABLE
+                </h3>
+
+                <p className="text-xs text-gray-300 mt-2">
+                  {registrationsError}
+                </p>
+              </div>
+            ) : registrations.length === 0 ? (
+              <div className="clean-glass p-8 rounded-3xl border border-white/10 text-center">
+                <Trophy className="w-10 h-10 text-[#00FF66] mx-auto mb-3" />
+
+                <h3 className="font-black text-white uppercase">
+                  No tournament history yet
+                </h3>
+
+                <p className="text-xs text-gray-300 mt-2">
+                  Your tournament registrations and match results will
+                  appear here once you participate in events.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {registrations.map((registration, index) => {
+                  const tournament = registration.tournamentId;
+
+                  const startDate = new Date(
+                    tournament.startDate,
+                  ).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+
+                  const endDate = new Date(
+                    tournament.endDate,
+                  ).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+
+                  return (
+                    <motion.div
+                      key={registration._id}
+                      initial={{ opacity: 0, x: -30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{
+                        duration: 0.5,
+                        delay: index * 0.08,
+                      }}
+                      className="clean-glass p-6 rounded-3xl border border-white/10 relative overflow-hidden group"
+                    >
+                      <div className="absolute -right-16 -top-16 w-40 h-40 rounded-full bg-[#00FF66]/10 blur-3xl group-hover:bg-[#00FF66]/20 transition-all duration-500" />
+
+                      <div className="cyber-content-layer">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-[#00FF66]">
+                                {tournament.sport}
+                              </span>
+
+                              <span className="text-[10px] text-gray-300">
+                                
+                              </span>
+
+                              <span className="text-[10px] font-mono text-gray-300 uppercase">
+                                {tournament.type}
+                              </span>
+                            </div>
+
+                            <h3 className="text-xl font-black text-white uppercase italic tracking-tight">
+                              {tournament.title}
+                            </h3>
+
+                            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-[#00FF66]" />
+                              {tournament.locationName}, {tournament.city}
+                            </p>
+                          </div>
+
+                          <span className="inline-flex items-center gap-1.5 self-start bg-[#00FF66]/10 text-[#00FF66] border border-[#00FF66]/30 px-3 py-1.5 rounded-full text-[10px] font-black uppercase">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {getTournamentStatus(registration)}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[11px] text-gray-300 uppercase font-black">
+                              Event Date
+                            </p>
+                            <p className="text-xs text-white font-bold mt-1">
+                              {startDate}
+                            </p>
+                            <p className="text-[10px] text-gray-300 mt-0.5">
+                              to {endDate}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[11px] text-gray-300 uppercase font-black">
+                              Format
+                            </p>
+                            <p className="text-xs text-white font-bold mt-1">
+                              {tournament.format}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[11px] text-gray-300 uppercase font-black">
+                              Entry Fee
+                            </p>
+                            <p className="text-xs text-[#00FF66] font-black mt-1">
+                              {tournament.entryFee === 0
+                                ? 'FREE'
+                                : `${tournament.entryFee.toLocaleString('en-IN')}`}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                            <p className="text-[11px] text-gray-300 uppercase font-black">
+                              Prize Pool
+                            </p>
+                            <p className="text-xs text-white font-black mt-1">
+                              {tournament.prizePool.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-[10px] font-mono uppercase">
+                          <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+                            <span className="text-gray-400 block mb-1">
+                              Capacity
+                            </span>
+                            <span className="text-gray-400">
+                              {tournament.registeredParticipants}/
+                              {tournament.maxParticipants} registered
+                            </span>
+                          </div>
+
+                          <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 sm:text-right">
+                            <span className="text-gray-400 block mb-1">
+                              Registered on
+                            </span>
+                            <span className="text-gray-400">
+                              {new Date(
+                                registration.registeredAt,
+                              ).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 text-[10px] font-mono uppercase">
+                              <span className="text-gray-400">Payment: </span>
+                              <span
+                                className={
+                                  registration.paymentStatus === 'SUCCESS'
+                                    ? 'text-[#00FF66] font-black'
+                                    : 'text-amber-400 font-black'
+                                }
+                              >
+                                {registration.paymentStatus || 'PENDING'}
+                              </span>
+                            </span>
+
+                            <span className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 text-[10px] font-mono">
+                              <span className="text-gray-400">Registration ID: </span>
+                              <span className="text-gray-400">
+                                {registration._id}
+                              </span>
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigateWithinProfile(
+                                `/profile?registration=${registration._id}`,
+                              );
+                            }}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#00FF66]/30 bg-[#00FF66]/10 px-5 py-2.5 text-[10px] font-black uppercase tracking-wider text-[#00FF66] transition hover:border-[#00FF66]/60 hover:bg-[#00FF66]/20"
+                          >
+                            <Ticket className="w-4 h-4" />
+                            View Ticket
+                          </button>
+                        </div>
+
+                        {registration.status === 'REGISTERED' &&
+                          getTournamentStatus(registration) === 'UPCOMING' &&
+                          registration.paymentStatus !== 'SUCCESS' &&
+                          registration.paymentStatus !== 'REFUNDED' && (
+                            <div className="mt-3 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCancelRegistration(registration)
+                                }
+                                disabled={
+                                  cancellingId === registration._id
+                                }
+                                className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-red-400 transition hover:border-red-500/60 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {cancellingId === registration._id
+                                  ? 'Cancelling...'
+                                  : 'Cancel Registration'}
+                              </button>
+                            </div>
+                          )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* RESULTS & ACHIEVEMENTS */}
+
+          {activeSection === 'achievements' &&
+          performance?.tournamentHistory?.length ? (
+            <div className="lg:col-span-12 mt-10 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black text-white italic tracking-tight uppercase flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-400" />
+                  RESULTS & ACHIEVEMENTS
+                </h2>
+
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                {performance.tournamentHistory.map((result) => {
+                  const startDate = new Date(
+                    result.startDate,
+                  ).toLocaleDateString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+
+                  const placementLabel =
+                    result.placement === 'CHAMPION'
+                      ? 'CHAMPION'
+                      : result.placement === 'RUNNER_UP'
+                        ? 'RUNNER-UP'
+                        : 'COMPLETED';
+
+                  return (
+                    <motion.div
+                      key={result.tournamentId}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="group relative min-h-[280px] overflow-hidden rounded-[32px] border border-amber-400/20 bg-gradient-to-br from-amber-400/[0.12] via-white/[0.045] to-transparent p-7 shadow-[0_20px_70px_rgba(245,158,11,0.08)] transition-all duration-500 hover:border-amber-400/40 hover:shadow-[0_25px_90px_rgba(245,158,11,0.14)] sm:p-9"
+                    >
+                      <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl transition-transform duration-700 group-hover:scale-125" />
+
+                      <div className="relative">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-4xl drop-shadow-[0_0_18px_rgba(245,158,11,0.35)]">
+                                {result.placement === 'CHAMPION'
+                                  ? ''
+                                  : result.placement === 'RUNNER_UP'
+                                    ? ''
+                                    : ''}
+                              </span>
+
+                              <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-1.5 text-[10px] font-black tracking-[0.18em] text-amber-300">
+                                {placementLabel}
+                              </span>
+                            </div>
+
+                            <h3 className="mt-5 text-2xl font-black uppercase italic tracking-tight text-white sm:text-3xl">
+                              {result.title}
+                            </h3>
+
+                            <p className="mt-2 text-xs font-mono uppercase tracking-[0.18em] text-gray-300">
+                              {result.sport}  {result.format}
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <span className="text-xs font-black uppercase tracking-wide text-gray-300">
+                              Event
+                            </span>
+                            <p className="mt-1 text-sm font-semibold text-gray-200">
+                              {startDate}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl border border-white/8 bg-black/20 p-4 backdrop-blur-sm">
+                            <span className="block text-xs font-black uppercase tracking-wide text-gray-300">
+                              Matches
+                            </span>
+                            <span className="mt-1 block text-2xl font-black text-white">
+                              {result.matchesPlayed}
+                            </span>
+                          </div>
+
+                          <div className="rounded-2xl border border-white/8 bg-black/20 p-4 backdrop-blur-sm">
+                            <span className="block text-xs font-black uppercase tracking-wide text-gray-300">
+                              Wins
+                            </span>
+                            <span className="mt-1 block text-2xl font-black text-[#00FF66]">
+                              {result.wins}
+                            </span>
+                          </div>
+
+                          <div className="rounded-2xl border border-white/8 bg-black/20 p-4 backdrop-blur-sm">
+                            <span className="block text-xs font-black uppercase tracking-wide text-gray-300">
+                              Location
+                            </span>
+                            <span className="mt-1 block truncate text-xs font-black text-cyan-400">
+                              {result.city}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-6 flex flex-col items-start justify-between gap-4 border-t border-white/8 pt-5 sm:flex-row sm:items-center">
+                          <span className="text-[11px] font-mono uppercase text-gray-400">
+                            {result.status}  {result.type}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sessionStorage.setItem(
+                                'sportora:profile-scroll',
+                                String(window.scrollY),
+                              );
+                              window.location.href =
+                                `/?tournament=${result.tournamentId}&view=achievement&placement=${result.placement ?? 'COMPLETED'}&matches=${result.matchesPlayed}&wins=${result.wins}&losses=${result.losses}`;
+                            }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-[#00FF66]/30 bg-[#00FF66]/10 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#00FF66] transition-all hover:border-[#00FF66]/60 hover:bg-[#00FF66]/20 hover:shadow-[0_0_25px_rgba(0,255,102,0.12)]"
+                          >
+                            View Tournament
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* BADGES & TROPHIES */}
+
+          {activeSection === 'achievements' && (
+          <div className="lg:col-span-4 relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-white/[0.045] via-white/[0.02] to-transparent shadow-[0_20px_80px_rgba(0,0,0,0.25)]">
+            <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-amber-400/[0.05] blur-3xl" />
+
+            <div className="relative flex flex-col gap-4 border-b border-white/8 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10">
+                  <Award className="h-6 w-6 text-amber-400" />
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-black italic tracking-tight text-white uppercase">
+                    BADGES & TROPHIES
+                  </h2>
+
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-300">
+                    Verified achievements earned on Sportora
+                  </p>
+                </div>
+              </div>
+
+              {profile?.groundCrewAchievements?.length ? (
+                <div className="w-fit rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-amber-400">
+                  {profile?.groundCrewAchievements.length}{" "}
+                  {profile?.groundCrewAchievements.length === 1
+                    ? "Badge"
+                    : "Badges"}{" "}
+                  Unlocked
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative p-5 sm:p-7">
+              {profile?.groundCrewAchievements?.length ? (
+                <div className="space-y-5">
+                  {profile?.groundCrewAchievements.map((achievement) => (
+                    <div
+                      key={`badge-${achievement._id}`}
+                      className="group relative overflow-hidden rounded-[26px] border border-amber-400/20 bg-gradient-to-br from-amber-400/[0.08] via-white/[0.025] to-black/20 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/40 hover:shadow-[0_18px_60px_rgba(251,191,36,0.08)] sm:p-6"
+                    >
+                      <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+
+                      <div className="relative">
+                        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-400/10 shadow-[0_0_35px_rgba(251,191,36,0.10)]">
+                              <Medal className="h-8 w-8 text-amber-400" />
+
+                              <span className="absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#111] bg-[#00FF66]">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-black" />
+                              </span>
+                            </div>
+
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-400">
+                                  Ground Crew
+                                </span>
+
+                                <span className="text-[11px] text-gray-700">
+                                  
+                                </span>
+
+                                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-300">
+                                  Verified Achievement
+                                </span>
+                              </div>
+
+                              <h3 className="mt-2 text-2xl font-black uppercase italic tracking-tight text-white">
+                                {achievement.role}
+                              </h3>
+                            </div>
+                          </div>
+
+                          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[#00FF66]/25 bg-[#00FF66]/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-[#00FF66]">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Verified
+                          </span>
+                        </div>
+
+                        <div className="mt-6 border-t border-white/8 pt-5">
+                          <p className="text-base font-black leading-snug text-white sm:text-lg">
+                            {achievement.tournamentTitle}
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.06] px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-cyan-400">
+                              {achievement.sport}
+                            </span>
+
+                            <span className="text-gray-700"></span>
+
+                            <span className="rounded-lg border border-white/8 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-gray-400">
+                              {achievement.city}, {achievement.state}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                              Event Date
+                            </p>
+
+                            <p className="mt-2 text-base font-black text-white">
+                              {new Date(
+                                achievement.eventDate,
+                              ).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-[#00FF66]/10 bg-[#00FF66]/[0.025] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-400">
+                              Verified On
+                            </p>
+
+                            <p className="mt-2 text-base font-black text-[#00FF66]">
+                              {new Date(
+                                achievement.verifiedAt,
+                              ).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-700">
+                            SPORTORA VERIFIED
+                          </span>
+
+                          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-400/60">
+                            {achievement.role}  GROUND CREW
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/15 bg-amber-400/10">
+                    <Award className="h-6 w-6 text-amber-400" />
+                  </div>
+
+                  <h4 className="mt-4 text-sm font-black uppercase tracking-wider text-white">
+                    YOUR JOURNEY STARTS HERE
+                  </h4>
+
+                  <p className="mx-auto mt-2 max-w-sm text-[10px] leading-relaxed text-gray-300">
+                    Participate in tournaments and complete verified Ground
+                    Crew assignments to unlock achievements and badges.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          )}
+
+
+        {/* EDIT PROFILE MODAL */}
+      {(activeSection === 'tickets'  ) && (
+            <div className="space-y-6 w-full animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div>
+                  <h2 className="text-xl font-black italic uppercase tracking-wider text-white flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-[#00FF66]" />
+                    MY TOURNAMENT TICKETS
+                  </h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Confirmed match passes and active entries for upcoming events.
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#00FF66]/10 border border-[#00FF66]/30 px-3.5 py-1 text-xs font-black text-[#00FF66]">
+                  2 ACTIVE TICKETS
+                </span>
+              </div>
+
+              {/* Tickets Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                
+                {/* Ticket Card 1 */}
+                <div className="clean-glass relative overflow-hidden rounded-3xl border border-white/10 p-6 flex flex-col justify-between hover:border-[#00FF66]/40 transition group">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="rounded-full bg-[#00FF66]/10 border border-[#00FF66]/30 px-3 py-1 text-[10px] font-black uppercase text-[#00FF66]">
+                        CONFIRMED PASS
+                      </span>
+                      <span className="font-mono text-xs text-gray-400 font-bold">#SPT-BDM-01</span>
+                    </div>
+                    <h3 className="text-lg font-black uppercase text-white group-hover:text-[#00FF66] transition">
+                      State Badminton Open 2026
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Bareilly Indoor Sports Complex • Singles Main Draw
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] text-gray-500 font-bold uppercase">ENTRY STATUS</div>
+                      <div className="text-xs font-black text-white">READY TO PLAY</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full bg-[#00FF66] px-4 py-2 text-xs font-black uppercase text-black hover:bg-[#00FF66]/90 transition"
+                    >
+                      VIEW QR PASS
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ticket Card 2 */}
+                <div className="clean-glass relative overflow-hidden rounded-3xl border border-white/10 p-6 flex flex-col justify-between hover:border-cyan-400/40 transition group">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="rounded-full bg-cyan-400/10 border border-cyan-400/30 px-3 py-1 text-[10px] font-black uppercase text-cyan-400">
+                        CONFIRMED PASS
+                      </span>
+                      <span className="font-mono text-xs text-gray-400 font-bold">#SPT-CRK-02</span>
+                    </div>
+                    <h3 className="text-lg font-black uppercase text-white group-hover:text-cyan-400 transition">
+                      UP Premier Cricket League
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Green Park Stadium • All-Rounder Slot
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] text-gray-500 font-bold uppercase">ENTRY STATUS</div>
+                      <div className="text-xs font-black text-white">VERIFIED</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black uppercase text-black hover:bg-cyan-300 transition"
+                    >
+                      VIEW QR PASS
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {isEditingProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="clean-glass relative w-full max-w-lg rounded-3xl border border-white/10 p-6 md:p-8 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+              <h3 className="text-lg font-black uppercase tracking-wider text-white">
+                Edit Profile
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsEditingProfile(false)}
+                className="rounded-xl border border-white/10 bg-white/5 p-2 text-gray-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                  Bio
+                </label>
+                <textarea
+                  value={bioInput}
+                  onChange={(e) => setBioInput(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
+                  placeholder="Tell us about yourself..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                  Sports & Interests (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={interestsInput}
+                  onChange={(e) => setInterestsInput(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
+                  placeholder="Cricket, Football, Badminton"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProfile(false)}
+                  className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-gray-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="rounded-full bg-[#00FF66] px-6 py-2.5 text-xs font-black uppercase tracking-wider text-black transition hover:bg-[#00FF66]/90 shadow-[0_0_15px_rgba(0,255,102,0.3)] disabled:opacity-50"
+                >
+                  {savingProfile ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+        </div>
+        </div>
+        </div>
+        </div>
+    );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#07090E] text-white pt-32 pb-24 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#00FF66] border-t-transparent" />
+            <span className="text-xs font-black uppercase tracking-wider text-gray-400">Loading Profile...</span>
+          </div>
+        </div>
+      }
+    >
+      <ProfileContent />
+    </Suspense>
+  );
+}

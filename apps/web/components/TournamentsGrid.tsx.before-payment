@@ -1,0 +1,1027 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+} from 'framer-motion';
+import {
+  ShieldCheck,
+  MapPin,
+  Calendar,
+  ArrowUpRight,
+  X,
+  CreditCard,
+  User,
+  CheckCircle,
+  CheckCircle2,
+  ArrowRight,
+  Users,
+  Trophy,
+  Clock3,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
+
+interface BackendTournament {
+  _id: string;
+  organizerId: string;
+  title: string;
+  sport: string;
+  format: string;
+  type: string;
+  city: string;
+  state: string;
+  locationName: string;
+  pincode?: string;
+  venuePhotos?: string[];
+  venueVideos?: string[];
+  permissionDocs?: string[];
+  startDate: string;
+  endDate: string;
+  registrationDeadline: string;
+  maxParticipants: number;
+  entryFee: number;
+  prizePool: number;
+  sponsors?: {
+    name: string;
+    logoUrl?: string;
+    _id?: string;
+  }[];
+  status: string;
+  aiRiskScore: number;
+  aiRiskAnalysis?: string;
+  registeredParticipants: number;
+}
+
+interface GridProps {
+  query?: string;
+}
+
+type RegistrationState =
+  | 'idle'
+  | 'registering'
+  | 'success'
+  | 'error';
+
+function formatCurrency(value: number) {
+  if (value === 0) return 'FREE';
+
+  return `₹${value.toLocaleString('en-IN')}`;
+}
+
+function formatDateRange(
+  startDate: string,
+  endDate: string,
+) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  const options: Intl.DateTimeFormatOptions = {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  };
+
+  const startText = start.toLocaleDateString(
+    'en-IN',
+    options,
+  );
+
+  const endText = end.toLocaleDateString(
+    'en-IN',
+    options,
+  );
+
+  return `${startText} — ${endText}`;
+}
+
+function formatTime(date: string) {
+  return new Date(date).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getSportIcon(sport: string) {
+  const normalized = sport.toLowerCase();
+
+  if (normalized.includes('football')) return '⚽';
+  if (normalized.includes('cricket')) return '🏏';
+  if (normalized.includes('badminton')) return '🏸';
+  if (normalized.includes('tennis')) return '🎾';
+  if (normalized.includes('basketball')) return '🏀';
+  if (normalized.includes('volleyball')) return '🏐';
+
+  return '🏆';
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'APPROVED':
+      return 'OPEN';
+
+    case 'PENDING':
+      return 'PENDING';
+
+    case 'REJECTED':
+      return 'REJECTED';
+
+    case 'COMPLETED':
+      return 'COMPLETED';
+
+    default:
+      return status;
+  }
+}
+
+function getTrustLabel(score: number) {
+  if (score >= 80) return 'HIGH TRUST';
+  if (score >= 50) return 'MEDIUM TRUST';
+  return 'VERIFYING';
+}
+
+export default function TournamentsGrid({
+  query = '',
+}: GridProps) {
+  const [tournaments, setTournaments] = useState<
+    BackendTournament[]
+  >([]);
+
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
+
+  const [selectedTournament, setSelectedTournament] =
+    useState<BackendTournament | null>(null);
+
+  const [registrationState, setRegistrationState] =
+    useState<RegistrationState>('idle');
+
+  const [registrationError, setRegistrationError] =
+    useState('');
+
+  const { scrollYProgress } = useScroll();
+
+  const headerY = useTransform(
+    scrollYProgress,
+    [0.08, 0.35],
+    [70, -20],
+  );
+
+  const headerOpacity = useTransform(
+    scrollYProgress,
+    [0.08, 0.22],
+    [0.3, 1],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTournaments() {
+      setLoading(true);
+      setFetchError('');
+
+      try {
+        const params = new URLSearchParams();
+
+        if (query.trim()) {
+          params.set('search', query.trim());
+        }
+
+        params.set('limit', '20');
+
+        const response = await fetch(
+          `/api/tournaments?${params.toString()}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'Failed to load tournaments',
+          );
+        }
+
+        if (!cancelled) {
+          setTournaments(data.tournaments || []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFetchError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to load tournaments',
+          );
+          setTournaments([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadTournaments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  const handleClose = () => {
+    setSelectedTournament(null);
+    setRegistrationState('idle');
+    setRegistrationError('');
+  };
+
+  async function handleRegister() {
+    if (!selectedTournament) return;
+
+    setRegistrationState('registering');
+    setRegistrationError('');
+
+    try {
+      const response = await fetch(
+        '/api/tournaments/register',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            tournamentId: selectedTournament._id,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Registration failed',
+        );
+      }
+
+      setRegistrationState('success');
+
+      setTournaments((current) =>
+        current.map((tournament) =>
+          tournament._id === selectedTournament._id
+            ? {
+                ...tournament,
+                registeredParticipants:
+                  tournament.registeredParticipants + 1,
+              }
+            : tournament,
+        ),
+      );
+
+      setSelectedTournament((current) =>
+        current
+          ? {
+              ...current,
+              registeredParticipants:
+                current.registeredParticipants + 1,
+            }
+          : current,
+      );
+    } catch (error) {
+      setRegistrationState('error');
+
+      setRegistrationError(
+        error instanceof Error
+          ? error.message
+          : 'Registration failed',
+      );
+    }
+  }
+
+  const filtered = tournaments.filter((tournament) => {
+    const q = query.toLowerCase().trim();
+
+    if (!q) return true;
+
+    return (
+      tournament.title.toLowerCase().includes(q) ||
+      tournament.sport.toLowerCase().includes(q) ||
+      tournament.city.toLowerCase().includes(q) ||
+      tournament.locationName
+        .toLowerCase()
+        .includes(q)
+    );
+  });
+
+  return (
+    <section
+      id="tournaments"
+      className="relative z-10 mx-auto max-w-7xl overflow-hidden px-6 py-28 sm:py-36"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-20 top-10 select-none text-[16rem] font-black leading-none tracking-[-0.08em] text-white/[0.025] sm:text-[24rem]"
+      >
+        03
+      </div>
+
+      <motion.div
+        style={{
+          y: headerY,
+          opacity: headerOpacity,
+        }}
+        className="relative z-10 mb-16 flex flex-col justify-between gap-8 lg:flex-row lg:items-end"
+      >
+        <div className="max-w-4xl">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="h-px w-12 bg-[#00ff66]" />
+
+            <span className="text-[10px] font-black tracking-[0.3em] text-[#00ff66]">
+              LIVE DISCOVERY ENGINE
+            </span>
+
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#00ff66] shadow-[0_0_15px_#00ff66]" />
+          </div>
+
+          <h2 className="text-5xl font-black uppercase leading-[0.9] tracking-[-0.05em] text-white sm:text-6xl md:text-7xl">
+            {query ? (
+              <>
+                RESULTS
+                <br />
+                <span className="text-[#00ff66]">
+                  FOR &quot;{query.toUpperCase()}&quot;
+                </span>
+              </>
+            ) : (
+              <>
+                THE NEXT
+                <br />
+                <span className="text-[#00ff66] sportora-text-glow">
+                  BIG GAME.
+                </span>
+              </>
+            )}
+          </h2>
+        </div>
+
+        <div className="max-w-sm border-l border-white/10 pl-5">
+          <p className="text-sm leading-7 text-white/45">
+            Verified tournaments across the sports ecosystem.
+            Pick an event, inspect the arena, and enter the
+            competition.
+          </p>
+
+          <div className="mt-5 flex items-center gap-3 text-[9px] font-bold tracking-[0.25em] text-white/25">
+            <span>DISCOVER</span>
+            <span className="h-px w-8 bg-white/10" />
+            <span>VERIFY</span>
+            <span className="h-px w-8 bg-white/10" />
+            <span>COMPETE</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {loading ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex min-h-[300px] items-center justify-center rounded-[32px] border border-white/10 bg-white/[0.02] backdrop-blur-xl"
+        >
+          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-[#00ff66]">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            SCANNING SPORTS ARENA
+          </div>
+        </motion.div>
+      ) : fetchError ? (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-[32px] border border-red-400/20 bg-red-500/[0.04] px-6 py-20 text-center backdrop-blur-xl"
+        >
+          <AlertCircle className="mx-auto h-10 w-10 text-red-400" />
+
+          <p className="mt-5 text-sm font-bold uppercase tracking-wider text-red-300">
+            {fetchError}
+          </p>
+        </motion.div>
+      ) : filtered.length > 0 ? (
+        <div className="relative">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[#00ff66]/10 to-transparent lg:block"
+          />
+
+          <div className="space-y-8 lg:space-y-16">
+            {filtered.map((item, index) => (
+              <TournamentCard
+                key={item._id}
+                item={item}
+                index={index}
+                onSelect={() => {
+                  setSelectedTournament(item);
+                  setRegistrationState('idle');
+                  setRegistrationError('');
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-[32px] border border-white/10 bg-white/[0.02] px-6 py-20 text-center backdrop-blur-xl"
+        >
+          <div className="text-5xl">⌁</div>
+
+          <p className="mt-5 text-sm font-bold uppercase tracking-wider text-white/50">
+            No tournaments found matching &quot;{query}&quot;.
+          </p>
+        </motion.div>
+      )}
+
+      <AnimatePresence>
+        {selectedTournament && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+            onClick={handleClose}
+          >
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: 40,
+                scale: 0.96,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: 1,
+              }}
+              exit={{
+                opacity: 0,
+                y: 30,
+                scale: 0.96,
+              }}
+              transition={{ duration: 0.35 }}
+              onClick={(event) =>
+                event.stopPropagation()
+              }
+              className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-white/10 bg-[#080B10] p-6 shadow-[0_0_80px_rgba(0,255,102,0.12)] sm:p-8"
+            >
+              <button
+                onClick={handleClose}
+                className="absolute right-5 top-5 z-20 rounded-full border border-white/10 bg-white/5 p-2 text-white/50 transition hover:border-[#00ff66]/40 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">
+                    {getSportIcon(
+                      selectedTournament.sport,
+                    )}
+                  </span>
+
+                  <span className="rounded-full border border-[#00ff66]/40 bg-[#00ff66]/10 px-3 py-1 text-xs font-black uppercase text-[#00ff66]">
+                    {selectedTournament.sport} •{' '}
+                    {getStatusLabel(
+                      selectedTournament.status,
+                    )}
+                  </span>
+                </div>
+
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic tracking-tight text-white sm:text-3xl">
+                    {selectedTournament.title}
+                  </h2>
+
+                  <p className="mt-2 text-xs leading-relaxed text-white/50">
+                    {selectedTournament.aiRiskAnalysis ||
+                      'Tournament information verified by Sportora.'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs sm:grid-cols-2">
+                  <div>
+                    <div className="font-mono text-[10px] uppercase text-white/30">
+                      VENUE
+                    </div>
+
+                    <div className="font-bold text-white">
+                      {selectedTournament.locationName},{' '}
+                      {selectedTournament.city}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-mono text-[10px] uppercase text-white/30">
+                      DATES
+                    </div>
+
+                    <div className="font-bold text-white">
+                      {formatDateRange(
+                        selectedTournament.startDate,
+                        selectedTournament.endDate,
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-mono text-[10px] uppercase text-white/30">
+                      FORMAT
+                    </div>
+
+                    <div className="font-bold text-white">
+                      {selectedTournament.format}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-mono text-[10px] uppercase text-white/30">
+                      TYPE
+                    </div>
+
+                    <div className="font-bold text-white">
+                      {selectedTournament.type}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <InfoStat
+                    icon={<Users className="h-4 w-4" />}
+                    label="REGISTERED"
+                    value={`${selectedTournament.registeredParticipants}/${selectedTournament.maxParticipants}`}
+                  />
+
+                  <InfoStat
+                    icon={<Trophy className="h-4 w-4" />}
+                    label="PRIZE POOL"
+                    value={formatCurrency(
+                      selectedTournament.prizePool,
+                    )}
+                  />
+
+                  <InfoStat
+                    icon={<CreditCard className="h-4 w-4" />}
+                    label="ENTRY"
+                    value={formatCurrency(
+                      selectedTournament.entryFee,
+                    )}
+                  />
+
+                  <InfoStat
+                    icon={<ShieldCheck className="h-4 w-4" />}
+                    label="AI SCORE"
+                    value={`${selectedTournament.aiRiskScore}`}
+                  />
+                </div>
+
+                <div className="space-y-3 border-y border-white/10 py-5">
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#00ff66]">
+                    EVENT INTELLIGENCE
+                  </h4>
+
+                  <div className="flex items-center gap-3 text-xs text-white/50">
+                    <MapPin className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                    <span>
+                      {selectedTournament.locationName},{' '}
+                      {selectedTournament.city},{' '}
+                      {selectedTournament.state}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-white/50">
+                    <Calendar className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                    <span>
+                      {formatDateRange(
+                        selectedTournament.startDate,
+                        selectedTournament.endDate,
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-white/50">
+                    <Clock3 className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                    <span>
+                      Starts at{' '}
+                      {formatTime(
+                        selectedTournament.startDate,
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-white/50">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                    <span>
+                      {getTrustLabel(
+                        selectedTournament.aiRiskScore,
+                      )}{' '}
+                      •{' '}
+                      {selectedTournament.aiRiskScore}
+                      /100
+                    </span>
+                  </div>
+                </div>
+
+                {registrationState === 'error' && (
+                  <div className="flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-xs text-red-300">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+
+                    <span>{registrationError}</span>
+                  </div>
+                )}
+
+                {registrationState === 'success' ? (
+                  <div className="space-y-6 py-6 text-center">
+                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#00ff66] text-black shadow-[0_0_50px_rgba(0,255,102,0.5)]">
+                      <CheckCircle2 className="h-12 w-12" />
+                    </div>
+
+                    <div>
+                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#00ff66]">
+                        REGISTRATION CONFIRMED
+                      </span>
+
+                      <h2 className="mt-1 text-3xl font-black uppercase italic text-white">
+                        YOU&apos;RE IN THE ARENA!
+                      </h2>
+
+                      <p className="mx-auto mt-2 max-w-sm text-xs text-white/50">
+                        Your Sportora registration has been
+                        recorded successfully.
+                      </p>
+                    </div>
+
+                    <div className="mx-auto max-w-sm rounded-2xl border border-white/10 bg-white/5 p-4 text-left text-xs">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-white/40">
+                          Event
+                        </span>
+
+                        <span className="text-right font-bold text-white">
+                          {selectedTournament.title}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex justify-between">
+                        <span className="text-white/40">
+                          Status
+                        </span>
+
+                        <span className="font-bold text-[#00ff66]">
+                          REGISTERED
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleClose}
+                      className="rounded-full bg-[#00ff66] px-8 py-3.5 text-xs font-extrabold uppercase text-black transition-all hover:bg-emerald-300"
+                    >
+                      RETURN TO ARENA HUB
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 border-t border-white/10 pt-5 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <div className="text-[10px] uppercase text-white/30">
+                        ENTRY FEE
+                      </div>
+
+                      <div className="text-2xl font-black text-[#00ff66]">
+                        {formatCurrency(
+                          selectedTournament.entryFee,
+                        )}
+                      </div>
+
+                      <div className="mt-1 text-[10px] text-white/30">
+                        Registration deadline:{' '}
+                        {new Date(
+                          selectedTournament.registrationDeadline,
+                        ).toLocaleDateString('en-IN')}
+                      </div>
+                    </div>
+
+                    {selectedTournament.entryFee > 0 ? (
+                      <div className="max-w-sm rounded-2xl border border-yellow-400/20 bg-yellow-400/[0.04] p-4 text-xs text-yellow-200/70">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
+
+                          <span>
+                            Online payment verification is
+                            not configured yet. Registration
+                            will be enabled after the payment
+                            gateway is connected.
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleRegister}
+                        disabled={
+                          registrationState ===
+                          'registering'
+                        }
+                        className="flex items-center justify-center gap-2 rounded-full bg-[#00ff66] px-8 py-3.5 text-xs font-extrabold uppercase text-black transition-all hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {registrationState ===
+                        'registering' ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            REGISTERING...
+                          </>
+                        ) : (
+                          <>
+                            REGISTER NOW
+                            <ArrowRight className="h-4 w-4" />
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function InfoStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="flex items-center gap-2 text-[#00ff66]">
+        {icon}
+        <span className="text-[8px] font-black tracking-wider text-white/30">
+          {label}
+        </span>
+      </div>
+
+      <div className="mt-2 text-sm font-black text-white">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function TournamentCard({
+  item,
+  index,
+  onSelect,
+}: {
+  item: BackendTournament;
+  index: number;
+  onSelect: () => void;
+}) {
+  const direction = index % 2 === 0 ? -80 : 80;
+
+  const registered =
+    item.registeredParticipants || 0;
+
+  const capacity =
+    item.maxParticipants || 0;
+
+  const fillPercentage =
+    capacity > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (registered / capacity) * 100,
+          ),
+        )
+      : 0;
+
+  const image =
+    item.venuePhotos?.[0] ||
+    'https://images.pexels.com/photos/47730/the-ball-stadion-football-the-pitch-47730.jpeg?auto=compress&cs=tinysrgb&w=1000';
+
+  const isFull =
+    capacity > 0 && registered >= capacity;
+
+  return (
+    <motion.article
+      initial={{
+        opacity: 0,
+        x: direction,
+        y: 40,
+      }}
+      whileInView={{
+        opacity: 1,
+        x: 0,
+        y: 0,
+      }}
+      viewport={{
+        once: true,
+        amount: 0.18,
+      }}
+      transition={{
+        duration: 0.85,
+        delay: index * 0.12,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="group relative"
+    >
+      <div className="absolute -left-1 top-8 hidden text-[9px] font-black tracking-[0.3em] text-white/20 lg:block">
+        EVENT / 0{index + 1}
+      </div>
+
+      <div className="grid overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.025] backdrop-blur-xl transition-all duration-500 group-hover:border-[#00ff66]/30 group-hover:shadow-[0_25px_80px_rgba(0,255,102,0.08)] md:grid-cols-[1.15fr_0.85fr]">
+        <div className="relative h-[300px] overflow-hidden md:h-[430px]">
+          <motion.img
+            src={image}
+            alt={item.title}
+            whileHover={{ scale: 1.08 }}
+            transition={{ duration: 0.8 }}
+            className="h-full w-full object-cover"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-black/10 to-[#080b10]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080b10] via-transparent to-black/30" />
+
+          <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full border border-white/15 bg-black/50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-xl">
+            <span className="text-base">
+              {getSportIcon(item.sport)}
+            </span>
+
+            <span className="text-[#00ff66]">
+              {item.sport}
+            </span>
+          </div>
+
+          <div className="absolute right-5 top-5 rounded-full bg-[#00ff66] px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-black shadow-[0_0_20px_rgba(0,255,102,0.25)]">
+            {getStatusLabel(item.status)}
+          </div>
+
+          <div className="absolute bottom-5 left-5 right-5">
+            <div className="mb-2 flex items-center justify-between text-[9px] font-bold tracking-[0.25em] text-white/50">
+              <span>
+                {getTrustLabel(item.aiRiskScore)}
+              </span>
+
+              <span>
+                {item.aiRiskScore}/100
+              </span>
+            </div>
+
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                initial={{ width: 0 }}
+                whileInView={{
+                  width: `${Math.max(
+                    item.aiRiskScore,
+                    4,
+                  )}%`,
+                }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: 1,
+                  delay: 0.4,
+                }}
+                className="h-full rounded-full bg-[#00ff66]"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col justify-between p-7 sm:p-9">
+          <div>
+            <div className="mb-6 flex items-center justify-between">
+              <span className="text-[9px] font-black tracking-[0.3em] text-white/25">
+                SPORTS / EVENT
+              </span>
+
+              <span className="text-5xl font-black tracking-[-0.08em] text-white/[0.06]">
+                0{index + 1}
+              </span>
+            </div>
+
+            <h3 className="max-w-xl text-3xl font-black uppercase leading-[0.95] tracking-[-0.04em] text-white transition-colors duration-300 group-hover:text-[#00ff66] sm:text-4xl">
+              {item.title}
+            </h3>
+
+            <p className="mt-5 text-sm leading-6 text-white/40">
+              {item.format} • {item.type} tournament in{' '}
+              {item.city}, {item.state}.
+            </p>
+
+            <div className="mt-7 space-y-3 border-y border-white/10 py-5 text-xs text-white/50">
+              <div className="flex items-center gap-3">
+                <MapPin className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                <span>
+                  {item.locationName}, {item.city}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Calendar className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                <span>
+                  {formatDateRange(
+                    item.startDate,
+                    item.endDate,
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Users className="h-4 w-4 shrink-0 text-[#00ff66]" />
+
+                <span>
+                  {registered}/{capacity} participants
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <div className="mb-3 flex items-center justify-between text-[9px] font-black tracking-[0.2em] text-white/25">
+              <span>ARENA CAPACITY</span>
+
+              <span>
+                {fillPercentage}% FILLED
+              </span>
+            </div>
+
+            <div className="h-1 overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                initial={{ width: 0 }}
+                whileInView={{
+                  width: `${fillPercentage}%`,
+                }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: 0.8,
+                  delay: index * 0.1,
+                }}
+                className="h-full bg-[#00ff66]"
+              />
+            </div>
+
+            <div className="mt-5 flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[9px] font-black tracking-[0.2em] text-white/25">
+                  ENTRY / PRIZE POOL
+                </div>
+
+                <div className="mt-1 flex items-center gap-3">
+                  <span className="text-xl font-black text-[#00ff66]">
+                    {formatCurrency(item.entryFee)}
+                  </span>
+
+                  <span className="text-xs text-white/30">
+                    →
+                  </span>
+
+                  <span className="text-sm font-bold text-white">
+                    {formatCurrency(item.prizePool)}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={onSelect}
+                disabled={isFull}
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white transition-all duration-300 hover:border-[#00ff66] hover:bg-[#00ff66] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isFull
+                  ? 'FULL'
+                  : 'ENTER EVENT'}
+
+                <ArrowUpRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.article>
+  );
+}

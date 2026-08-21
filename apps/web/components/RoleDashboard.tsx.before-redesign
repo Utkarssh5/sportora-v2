@@ -1,0 +1,210 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Trophy, ShieldCheck, Users, Radio, PlusCircle, 
+  CheckCircle2, FileText, UserCheck, DollarSign, LayoutDashboard, Search
+} from 'lucide-react';
+
+type Role = 'player' | 'organizer' | 'crew' | 'admin';
+
+export default function RoleDashboard() {
+  const [role, setRole] = useState<Role>('player');
+
+  return (
+    <div className="py-12 px-6 max-w-7xl mx-auto">
+      
+      {/* Role Switcher Navigation Strip */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 clean-glass p-4 rounded-3xl mb-12 border border-white/10">
+        <div>
+          <span className="text-xs font-mono text-[#00FF66] tracking-widest uppercase block mb-1">
+            • SELECT USER PERSPECTIVE
+          </span>
+          <h2 className="text-xl font-bold text-white uppercase tracking-tight">
+            ACTIVE ROLE: <span className="text-[#00FF66] underline">{role.toUpperCase()}</span>
+          </h2>
+        </div>
+
+        {/* Role Select Buttons */}
+        <div className="flex flex-wrap gap-2">
+          {(['player', 'organizer', 'crew', 'admin'] as Role[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRole(r)}
+              className={`px-5 py-2.5 rounded-full text-xs font-extrabold uppercase tracking-wider transition-all ${
+                role === r
+                  ? 'bg-[#00FF66] text-black shadow-lg shadow-[#00FF66]/30'
+                  : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {r} View
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Dynamic View Rendering Based On Selected Role */}
+      <AnimatePresence mode="wait">
+        
+        {/* PLAYER VIEW */}
+        {role === 'player' && (
+          <motion.div
+            key="player"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div className="clean-glass p-8 rounded-3xl border border-[#00FF66]/30">
+              <div className="flex items-center gap-3 text-[#00FF66] font-mono text-xs font-bold mb-2">
+                <Trophy className="w-4 h-4" /> PLAYER ARENA HUB
+              </div>
+              <h3 className="text-3xl font-black text-white">FIND TOURNAMENTS & JOIN MATCHES</h3>
+              <p className="text-gray-400 text-sm mt-2 max-w-2xl">
+                Discover local badminton, cricket, and esports tournaments. Instant Razorpay checkout and live match scorecard tracking.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <Search className="w-6 h-6 text-[#00FF66] mb-2" />
+                  <h4 className="font-bold text-white">Find Tournaments</h4>
+                  <p className="text-xs text-gray-400 mt-1">Filter by city, sport, or entry fee.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <Radio className="w-6 h-6 text-cyan-400 mb-2" />
+                  <h4 className="font-bold text-white">My Live Scores</h4>
+                  <p className="text-xs text-gray-400 mt-1">Real-time WebSocket score updates.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <CheckCircle2 className="w-6 h-6 text-amber-400 mb-2" />
+                  <h4 className="font-bold text-white">Verified Venues</h4>
+                  <p className="text-xs text-gray-400 mt-1">0% Fraud AI Pre-Screener protection.</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ORGANIZER VIEW */}
+        {role === 'organizer' && (
+          <motion.div
+            key="organizer"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div className="clean-glass p-8 rounded-3xl border border-cyan-400/30">
+              <div className="flex items-center gap-3 text-cyan-400 font-mono text-xs font-bold mb-2">
+                <PlusCircle className="w-4 h-4" /> TOURNAMENT ORGANIZER PORTAL
+              </div>
+              <h3 className="text-3xl font-black text-white">HOST EVENT & HIRE GROUND CREW</h3>
+              <p className="text-gray-400 text-sm mt-2 max-w-2xl">
+                Create new tournaments, upload ground NOCs for AI approval, and hire verified umpires & referees directly.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <PlusCircle className="w-6 h-6 text-cyan-400 mb-2" />
+                  <h4 className="font-bold text-white">Create Tournament</h4>
+                  <p className="text-xs text-gray-400 mt-1">Set entry fee, prize pool, and dates.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <Users className="w-6 h-6 text-[#00FF66] mb-2" />
+                  <h4 className="font-bold text-white">Hire Ground Crew</h4>
+                  <p className="text-xs text-gray-400 mt-1">On-demand referees & scorekeepers.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <ShieldCheck className="w-6 h-6 text-amber-400 mb-2" />
+                  <h4 className="font-bold text-white">AI Compliance Score</h4>
+                  <p className="text-xs text-gray-400 mt-1">Automatic verification status.</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* GROUND CREW VIEW */}
+        {role === 'crew' && (
+          <motion.div
+            key="crew"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div className="clean-glass p-8 rounded-3xl border border-amber-400/30">
+              <div className="flex items-center gap-3 text-amber-400 font-mono text-xs font-bold mb-2">
+                <Users className="w-4 h-4" /> GROUND CREW MARKETPLACE PORTAL
+              </div>
+              <h3 className="text-3xl font-black text-white">OFFICIATE MATCHES & EARN</h3>
+              <p className="text-gray-400 text-sm mt-2 max-w-2xl">
+                View tournament duty assignments, confirm officiating schedules, and track instant payouts.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <UserCheck className="w-6 h-6 text-amber-400 mb-2" />
+                  <h4 className="font-bold text-white">Available Duty Requests</h4>
+                  <p className="text-xs text-gray-400 mt-1">Accept nearby referee assignments.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <FileText className="w-6 h-6 text-cyan-400 mb-2" />
+                  <h4 className="font-bold text-white">KYC & Badge Status</h4>
+                  <p className="text-xs text-gray-400 mt-1">Keep certifications up to date.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <DollarSign className="w-6 h-6 text-[#00FF66] mb-2" />
+                  <h4 className="font-bold text-white">Payout Ledger</h4>
+                  <p className="text-xs text-gray-400 mt-1">Direct bank/UPI transfer logs.</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ADMIN VIEW */}
+        {role === 'admin' && (
+          <motion.div
+            key="admin"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-8"
+          >
+            <div className="clean-glass p-8 rounded-3xl border border-red-500/30">
+              <div className="flex items-center gap-3 text-red-400 font-mono text-xs font-bold mb-2">
+                <LayoutDashboard className="w-4 h-4" /> PLATFORM SUPER-ADMIN CONTROL
+              </div>
+              <h3 className="text-3xl font-black text-white">PLATFORM HEALTH & RISK REVIEW</h3>
+              <p className="text-gray-400 text-sm mt-2 max-w-2xl">
+                360-degree control over AI screening flags, system metrics, user KYC approvals, and platform commission ledgers.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <ShieldCheck className="w-6 h-6 text-red-400 mb-2" />
+                  <h4 className="font-bold text-white">AI Flagged Audits</h4>
+                  <p className="text-xs text-gray-400 mt-1">Review tournaments with risk score &gt; 60%.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <DollarSign className="w-6 h-6 text-[#00FF66] mb-2" />
+                  <h4 className="font-bold text-white">Platform Revenue</h4>
+                  <p className="text-xs text-gray-400 mt-1">Track 5% platform commission fees.</p>
+                </div>
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <Users className="w-6 h-6 text-cyan-400 mb-2" />
+                  <h4 className="font-bold text-white">User Approvals</h4>
+                  <p className="text-xs text-gray-400 mt-1">Approve ground crew certifications.</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
+
+    </div>
+  );
+}

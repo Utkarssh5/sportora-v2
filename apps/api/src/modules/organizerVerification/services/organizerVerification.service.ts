@@ -22,6 +22,11 @@ export class OrganizerVerificationService {
     return organizerVerificationRepository.create({
       organizer: organizerId as any,
       organizationName: data.organizationName,
+      governmentIdType: data.governmentIdType,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      pincode: data.pincode,
       governmentId: data.governmentId,
       documentUrl: data.documentUrl,
       status: VerificationStatus.PENDING,

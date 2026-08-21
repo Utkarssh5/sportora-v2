@@ -1,0 +1,629 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Users,
+  ShieldCheck,
+  Star,
+  Search,
+  MapPin,
+  BriefcaseBusiness,
+  Bell,
+  Check,
+  X,
+} from 'lucide-react';
+import Navbar from '../../components/Navbar';
+
+interface CrewProfile {
+  _id: string;
+  userId: string;
+  fullName: string;
+  role: string;
+  sportsExpertise: string[];
+  skills: string[];
+  city: string;
+  state: string;
+  experienceYears: number;
+  isAvailable: boolean;
+  rating: number;
+}
+
+interface CrewInvitation {
+  _id: string;
+  tournamentId:
+    | string
+    | {
+        _id: string;
+        name?: string;
+        title?: string;
+        startDate?: string;
+        endDate?: string;
+        city?: string;
+        state?: string;
+      };
+  requirementId:
+    | string
+    | {
+        _id: string;
+        role?: string;
+        quantity?: number;
+        filledQuantity?: number;
+      };
+  eventDate: string;
+  status:
+    | 'INVITED'
+    | 'ACCEPTED'
+    | 'DECLINED'
+    | 'CANCELLED';
+  message?: string;
+  invitedAt: string;
+  respondedAt?: string;
+}
+
+const SPORTS = [
+  'All',
+  'Football',
+  'Cricket',
+  'Badminton',
+  'Table Tennis',
+  'Basketball',
+  'Volleyball',
+  'Hockey',
+  'Tennis',
+  'Kabaddi',
+];
+
+export default function CrewPage() {
+  const [searchCity, setSearchCity] = useState('');
+  const [selectedSport, setSelectedSport] = useState('All');
+  const [crewList, setCrewList] = useState<CrewProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [invitations, setInvitations] = useState<
+    CrewInvitation[]
+  >([]);
+  const [loadingInvitations, setLoadingInvitations] =
+    useState(true);
+  const [invitationActionId, setInvitationActionId] =
+    useState<string | null>(null);
+  const [invitationError, setInvitationError] =
+    useState('');
+  const [invitationSuccess, setInvitationSuccess] =
+    useState('');
+
+
+  useEffect(() => {
+    const loadInvitations = async () => {
+      try {
+        setLoadingInvitations(true);
+        setInvitationError('');
+
+        const response = await fetch(
+          '/api/tournament-crew/invitations/my',
+          {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        // Public marketplace users may not be logged in.
+        // Do not turn a normal 401 into a page-level error.
+        if (response.status === 401) {
+          setInvitations([]);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              'Failed to load crew invitations.',
+          );
+        }
+
+        setInvitations(data.data || []);
+      } catch (err) {
+        console.error(
+          'Crew invitations error:',
+          err,
+        );
+
+        setInvitationError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to load crew invitations.',
+        );
+      } finally {
+        setLoadingInvitations(false);
+      }
+    };
+
+    loadInvitations();
+  }, []);
+
+  const handleInvitationResponse = async (
+    invitationId: string,
+    responseValue: 'ACCEPTED' | 'DECLINED',
+  ) => {
+    try {
+      setInvitationActionId(invitationId);
+      setInvitationError('');
+      setInvitationSuccess('');
+
+      const response = await fetch(
+        `/api/tournament-crew/invitations/${invitationId}/respond`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            response: responseValue,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Unable to respond to invitation.',
+        );
+      }
+
+      setInvitations((current) =>
+        current.map((invitation) =>
+          invitation._id === invitationId
+            ? {
+                ...invitation,
+                status: responseValue,
+                respondedAt:
+                  new Date().toISOString(),
+              }
+            : invitation,
+        ),
+      );
+
+      setInvitationSuccess(
+        responseValue === 'ACCEPTED'
+          ? 'Invitation accepted. You are now assigned to the tournament.'
+          : 'Invitation declined.',
+      );
+    } catch (err) {
+      console.error(
+        'Crew invitation response error:',
+        err,
+      );
+
+      setInvitationError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to respond to invitation.',
+      );
+    } finally {
+      setInvitationActionId(null);
+    }
+  };
+
+  useEffect(() => {
+    const loadCrew = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const params = new URLSearchParams();
+
+        if (searchCity.trim()) {
+          params.set('city', searchCity.trim());
+        }
+
+        if (selectedSport !== 'All') {
+          params.set('sport', selectedSport);
+        }
+
+        const response = await fetch(
+          `/api/crew/search?${params.toString()}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Failed to load Ground Crew.',
+          );
+        }
+
+        setCrewList(data.data || []);
+      } catch (err) {
+        console.error('Crew marketplace error:', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to load Ground Crew.',
+        );
+        setCrewList([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const timeout = setTimeout(loadCrew, 250);
+
+    return () => clearTimeout(timeout);
+  }, [searchCity, selectedSport]);
+
+  return (
+    <main className="min-h-screen bg-[#080B10] text-white selection:bg-[#00FF66] selection:text-black pt-28 pb-20 px-6">
+      <Navbar />
+
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2 text-xs font-bold text-cyan-400 tracking-widest uppercase mb-3">
+            <Users className="w-4 h-4" />
+            ON-DEMAND MARKETPLACE
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+            FIND GROUND CREW
+          </h1>
+
+          <p className="text-gray-400 mt-3 text-sm sm:text-base">
+            Discover available referees, umpires, scorekeepers and
+            volunteers for your sports events.
+          </p>
+        </div>
+
+
+        {/* My Crew Invitations */}
+        {!loadingInvitations &&
+          invitations.some(
+            (invitation) =>
+              invitation.status === 'INVITED',
+          ) && (
+            <section className="max-w-5xl mx-auto mb-12">
+              <div className="clean-glass rounded-3xl border border-cyan-400/20 bg-cyan-400/[0.03] p-5 sm:p-6">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-cyan-400" />
+                  <h2 className="text-lg font-black uppercase tracking-tight">
+                    My Invitations
+                  </h2>
+
+                  <span className="ml-auto rounded-full bg-cyan-400/10 border border-cyan-400/20 px-2.5 py-1 text-[10px] font-black text-cyan-400">
+                    {
+                      invitations.filter(
+                        (invitation) =>
+                          invitation.status ===
+                          'INVITED',
+                      ).length
+                    }{' '}
+                    PENDING
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Tournament organizers can invite you for
+                  specific Ground Crew requirements.
+                </p>
+
+                {invitationError && (
+                  <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3">
+                    <p className="text-xs text-red-400">
+                      {invitationError}
+                    </p>
+                  </div>
+                )}
+
+                {invitationSuccess && (
+                  <div className="mt-4 rounded-2xl border border-[#00FF66]/20 bg-[#00FF66]/5 px-4 py-3">
+                    <p className="text-xs text-[#00FF66]">
+                      {invitationSuccess}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-5 space-y-3">
+                  {invitations
+                    .filter(
+                      (invitation) =>
+                        invitation.status === 'INVITED',
+                    )
+                    .map((invitation) => {
+                      const tournament =
+                        typeof invitation.tournamentId ===
+                        'object'
+                          ? invitation.tournamentId
+                          : null;
+
+                      const requirement =
+                        typeof invitation.requirementId ===
+                        'object'
+                          ? invitation.requirementId
+                          : null;
+
+                      const tournamentName =
+                        tournament?.name ||
+                        tournament?.title ||
+                        'Tournament Invitation';
+
+                      const location = [
+                        tournament?.city,
+                        tournament?.state,
+                      ]
+                        .filter(Boolean)
+                        .join(', ');
+
+                      return (
+                        <motion.div
+                          key={invitation._id}
+                          initial={{
+                            opacity: 0,
+                            y: 8,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                          }}
+                          className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                        >
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                            <div className="flex-1">
+                              <p className="text-sm font-black text-white">
+                                {tournamentName}
+                              </p>
+
+                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-400">
+                                <span>
+                                  Role:{' '}
+                                  <strong className="text-cyan-400">
+                                    {requirement?.role ||
+                                      'GROUND CREW'}
+                                  </strong>
+                                </span>
+
+                                <span>
+                                  Event:{' '}
+                                  {new Date(
+                                    invitation.eventDate,
+                                  ).toLocaleDateString(
+                                    'en-IN',
+                                    {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    },
+                                  )}
+                                </span>
+
+                                {location && (
+                                  <span>
+                                    {location}
+                                  </span>
+                                )}
+                              </div>
+
+                              {invitation.message && (
+                                <p className="mt-3 text-xs leading-5 text-gray-500">
+                                  “{invitation.message}”
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex gap-2 sm:w-auto">
+                              <button
+                                type="button"
+                                disabled={
+                                  invitationActionId ===
+                                  invitation._id
+                                }
+                                onClick={() =>
+                                  handleInvitationResponse(
+                                    invitation._id,
+                                    'DECLINED',
+                                  )
+                                }
+                                className="flex-1 sm:flex-none rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-[11px] font-black uppercase text-gray-300 transition hover:bg-white/10 disabled:opacity-50"
+                              >
+                                <span className="inline-flex items-center gap-1.5">
+                                  <X className="w-3.5 h-3.5" />
+                                  Decline
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  invitationActionId ===
+                                  invitation._id
+                                }
+                                onClick={() =>
+                                  handleInvitationResponse(
+                                    invitation._id,
+                                    'ACCEPTED',
+                                  )
+                                }
+                                className="flex-1 sm:flex-none rounded-full bg-[#00FF66] px-4 py-2.5 text-[11px] font-black uppercase text-black transition hover:brightness-110 disabled:opacity-50"
+                              >
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Check className="w-3.5 h-3.5" />
+                                  Accept
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                </div>
+              </div>
+            </section>
+          )}
+
+        {/* Filters */}
+        <div className="clean-glass p-4 rounded-3xl max-w-5xl mx-auto mb-12 border border-white/10 flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2.5 rounded-full w-full sm:w-1/2">
+            <Search className="w-4 h-4 text-gray-400 shrink-0" />
+
+            <input
+              type="text"
+              value={searchCity}
+              onChange={(e) => setSearchCity(e.target.value)}
+              placeholder="Filter by City (e.g. Jaipur, Kota)..."
+              className="bg-transparent text-xs text-white placeholder-gray-500 outline-none w-full"
+            />
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto w-full sm:w-1/2 justify-start sm:justify-end pb-1">
+            {SPORTS.map((sport) => (
+              <button
+                key={sport}
+                onClick={() => setSelectedSport(sport)}
+                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                  selectedSport === sport
+                    ? 'bg-cyan-400 text-black'
+                    : 'bg-white/5 text-gray-400 hover:text-white'
+                }`}
+              >
+                {sport}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-20 text-gray-400 text-sm">
+            Loading available Ground Crew...
+          </div>
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <div className="max-w-xl mx-auto text-center py-12 px-6 rounded-3xl border border-red-400/20 bg-red-400/5">
+            <p className="text-red-400 text-sm font-semibold">
+              {error}
+            </p>
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading && !error && crewList.length === 0 && (
+          <div className="max-w-xl mx-auto text-center py-20">
+            <Users className="w-10 h-10 text-gray-600 mx-auto mb-4" />
+
+            <h3 className="text-lg font-bold text-white">
+              No Ground Crew found
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-2">
+              Try another city or sport.
+            </p>
+          </div>
+        )}
+
+        {/* Crew Grid */}
+        {!loading && !error && crewList.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {crewList.map((crew) => (
+              <motion.div
+                key={crew._id}
+                whileHover={{ y: -6 }}
+                className="clean-glass rounded-3xl p-6 border border-white/10 hover:border-cyan-400/50 transition-all flex flex-col justify-between text-center relative"
+              >
+                <div>
+                  <div className="relative w-24 h-24 mx-auto mb-4">
+                    <div className="w-full h-full rounded-full border-2 border-cyan-400 bg-cyan-400/10 flex items-center justify-center">
+                      <Users className="w-10 h-10 text-cyan-400" />
+                    </div>
+
+                    <ShieldCheck className="w-6 h-6 text-cyan-400 fill-black absolute bottom-0 right-0" />
+                  </div>
+
+                  <h3 className="text-xl font-bold text-white">
+                    {crew.fullName}
+                  </h3>
+
+                  <p className="text-xs text-cyan-400 font-semibold mt-1">
+                    {crew.role}
+                  </p>
+
+                  <p className="text-xs text-gray-500 mt-1 flex items-center justify-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {crew.city}, {crew.state}
+                  </p>
+
+                  <div className="flex items-center justify-center gap-3 mt-4 text-xs text-gray-300">
+                    <span className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      {crew.rating.toFixed(1)}
+                    </span>
+
+                    <span>•</span>
+
+                    <span>
+                      {crew.experienceYears} yrs experience
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-4">
+                    {crew.sportsExpertise
+                      .slice(0, 3)
+                      .map((sport) => (
+                        <span
+                          key={sport}
+                          className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-gray-300"
+                        >
+                          {sport}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-white/10">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        crew.isAvailable
+                          ? 'bg-[#00FF66]'
+                          : 'bg-gray-500'
+                      }`}
+                    />
+
+                    <span
+                      className={`text-xs font-bold ${
+                        crew.isAvailable
+                          ? 'text-[#00FF66]'
+                          : 'text-gray-500'
+                      }`}
+                    >
+                      {crew.isAvailable
+                        ? 'AVAILABLE'
+                        : 'CURRENTLY UNAVAILABLE'}
+                    </span>
+                  </div>
+
+                  <div className="w-full py-2.5 bg-white/5 border border-white/10 text-gray-300 font-extrabold text-xs uppercase tracking-wider rounded-full flex items-center justify-center gap-1.5">
+                    <BriefcaseBusiness className="w-4 h-4" />
+                    Assign Through Tournament
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

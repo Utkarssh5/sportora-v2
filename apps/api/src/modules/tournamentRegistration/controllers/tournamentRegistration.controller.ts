@@ -81,6 +81,37 @@ class TournamentRegistrationController {
     }
   }
 
+  async verifyRegistration(req: Request, res: Response) {
+    try {
+      const { registrationId } = req.params;
+
+      if (
+        typeof registrationId !== "string"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid registration ID",
+        });
+      }
+
+      const result =
+        await tournamentRegistrationService.verifyRegistration(
+          registrationId
+        );
+
+      return res.status(result.valid ? 200 : 404).json({
+        success: result.valid,
+        ...result,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Unable to verify registration",
+      });
+    }
+  }
+
+
   async cancel(req: Request, res: Response) {
     try {
       const user = req.user as { id: string };

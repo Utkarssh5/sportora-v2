@@ -19,8 +19,15 @@ export interface IUser extends Document {
   role: UserRole;
 
   isVerified: boolean;
+  mustChangePassword: boolean;
 
   profileImage?: string;
+
+  bio?: string;
+  city?: string;
+  state?: string;
+  interests?: string[];
+  achievements?: string[];
 
   createdAt: Date;
   updatedAt: Date;
@@ -61,9 +68,45 @@ const UserSchema = new Schema<IUser>(
       default: false,
     },
 
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+
     profileImage: {
       type: String,
       default: "",
+    },
+
+    bio: {
+      type: String,
+      default: "",
+      maxlength: 250,
+      trim: true,
+    },
+
+    city: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 100,
+    },
+
+    state: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 100,
+    },
+
+    interests: {
+      type: [String],
+      default: [],
+    },
+
+    achievements: {
+      type: [String],
+      default: [],
     },
   },
   {

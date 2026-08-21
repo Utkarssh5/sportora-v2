@@ -33,6 +33,22 @@ class TournamentRepository {
   }
 
 
+  async findByOrganizer(organizerId: string) {
+    return await TournamentModel
+      .find({ organizerId })
+      .sort({ createdAt: -1 });
+  }
+
+  async findActiveByOrganizer(organizerId: string) {
+    return await TournamentModel.findOne({
+      organizerId,
+      status: {
+        $in: ["PENDING_APPROVAL", "APPROVED", "ONGOING"],
+      },
+    }).sort({ createdAt: -1 });
+  }
+
+
   async update(
     id: string,
     data: Partial<ITournament>
