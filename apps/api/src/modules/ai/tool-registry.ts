@@ -5,6 +5,7 @@ import { registrationTools } from "./tools/registration.tools.js";
 import { paymentTools } from "./tools/payment.tools.js";
 import { matchTools } from "./tools/match.tools.js";
 import { crewTools } from "./tools/crew.tools.js";
+import { userTools } from "./tools/user.tools.js";
 
 import type {
   AgentContext,
@@ -91,6 +92,16 @@ export const agentToolDeclarations = [
         },
       },
       required: ["registrationId"],
+    },
+  },
+
+  {
+    name: "confirm_pending_registration",
+    description:
+      "Confirm a previously requested tournament registration after the player explicitly says yes, proceed, confirm, kar do, haan, or equivalent. This only confirms a pending registration from an earlier conversation turn.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
     },
   },
 
@@ -300,6 +311,16 @@ export const agentToolDeclarations = [
       required: ["isAvailable"],
     },
   },
+
+  {
+    name: "get_my_profile",
+    description:
+      "Get the authenticated player's profile information.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
 ];
 
 
@@ -325,6 +346,9 @@ export const agentToolHandlers: Record<string, ToolHandler> = {
   cancel_registration: (args, context) =>
     registrationTools.cancel(args, context),
 
+  confirm_pending_registration: (args, context) =>
+    registrationTools.confirmPendingRegistration(args, context),
+
   create_payment_order: (args, context) =>
     paymentTools.createOrder(args, context),
 
@@ -348,4 +372,38 @@ export const agentToolHandlers: Record<string, ToolHandler> = {
 
   update_crew_availability: (args, context) =>
     crewTools.updateAvailability(args, context),
+
+  get_my_profile: (args, context) =>
+    userTools.getMyProfile(args, context),
 };
+
+/**
+ * Tools exposed to the authenticated PLAYER agent.
+ *
+ * Keep this list intentionally limited to player capabilities.
+ * The underlying tool handlers remain shared with the default agent.
+ */
+const PLAYER_TOOL_NAMES = new Set([
+  "search_tournaments",
+  "get_tournament",
+  "register_for_tournament",
+  "get_my_registrations",
+  "cancel_registration",
+  "confirm_pending_registration",
+  "create_payment_order",
+  "get_match_details",
+  "get_tournament_matches",
+  "get_my_profile",
+]);
+
+export const playerToolDeclarations =
+  agentToolDeclarations.filter((tool) =>
+    PLAYER_TOOL_NAMES.has(tool.name)
+  );
+
+export const playerToolHandlers: Record<string, ToolHandler> =
+  Object.fromEntries(
+    Object.entries(agentToolHandlers).filter(([name]) =>
+      PLAYER_TOOL_NAMES.has(name)
+    )
+  );

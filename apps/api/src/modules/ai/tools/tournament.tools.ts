@@ -5,6 +5,7 @@ export const tournamentTools = {
 
   async searchTournaments(
     args: {
+      search?: string;
       sport?: string;
       city?: string;
       state?: string;
@@ -17,7 +18,27 @@ export const tournamentTools = {
     _context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      const filter: Record<string, unknown> = {};
+      const filter: Record<string, unknown> = {
+        status: "APPROVED",
+        registrationDeadline: {
+          $gt: new Date(),
+        },
+      };
+
+      if (args.search) {
+        const searchRegex = new RegExp(
+          escapeRegex(args.search),
+          "i"
+        );
+
+        filter.$or = [
+          { title: searchRegex },
+          { sport: searchRegex },
+          { city: searchRegex },
+          { state: searchRegex },
+          { locationName: searchRegex },
+        ];
+      }
 
       if (args.sport) {
         filter.sport = new RegExp(`^${escapeRegex(args.sport)}$`, "i");
@@ -29,10 +50,6 @@ export const tournamentTools = {
 
       if (args.state) {
         filter.state = new RegExp(`^${escapeRegex(args.state)}$`, "i");
-      }
-
-      if (args.status) {
-        filter.status = args.status.toUpperCase();
       }
 
       if (args.minEntryFee !== undefined || args.maxEntryFee !== undefined) {
