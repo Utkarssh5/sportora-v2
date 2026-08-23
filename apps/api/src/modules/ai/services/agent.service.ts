@@ -25,6 +25,10 @@ import type {
   AgentToolResult,
 } from "../types.js";
 
+import type {
+  AgentStepContractContext,
+} from "./agent-step-contract.service.js";
+
 
 type AgentContent = {
   role: "user" | "model";
@@ -82,6 +86,56 @@ function buildRuntimeContext(
   ].join("\n");
 }
 
+
+function buildStepRuntimeContext(
+  context: AgentContext,
+  agentState: any,
+  pendingRegistration: any
+): AgentStepContractContext {
+  const information: Record<string, unknown> = {};
+  const confirmations: Record<string, boolean> = {};
+
+  const goal = agentState?.goal;
+
+  if (goal?.constraints) {
+    Object.assign(information, goal.constraints);
+  }
+
+  if (goal?.requiredInformation) {
+    for (const field of goal.requiredInformation) {
+      if (goal.constraints?.[field] !== undefined) {
+        information[field] = goal.constraints[field];
+      }
+    }
+  }
+
+  if (agentState?.activeEntity?.id) {
+    information.entityId =
+      agentState.activeEntity.id;
+  }
+
+  if (agentState?.activeEntity?.type) {
+    information.entityType =
+      agentState.activeEntity.type;
+  }
+
+  if (pendingRegistration?.tournamentId) {
+    information.tournamentId =
+      pendingRegistration.tournamentId;
+  }
+
+  if (
+    pendingRegistration?.confirmedAt
+  ) {
+    confirmations.payment = true;
+  }
+
+  return {
+    context,
+    information,
+    confirmations,
+  };
+}
 
 export class AgentService {
 
@@ -462,6 +516,48 @@ export class AgentService {
                       toolName: step.toolName,
                     }
                   : {}),
+                ...((step as unknown as AgentPlan["steps"][number]).requiredInformation != null
+                  ? {
+                      requiredInformation:
+                        [...((step as unknown as AgentPlan["steps"][number]).requiredInformation ?? [])],
+                    }
+                  : {}),
+
+                ...((step as unknown as AgentPlan["steps"][number]).constraints != null
+                  ? {
+                      constraints:
+                        { ...(step as unknown as AgentPlan["steps"][number]).constraints },
+                    }
+                  : {}),
+
+                ...((step as unknown as AgentPlan["steps"][number]).successCriteria != null
+                  ? {
+                      successCriteria:
+                        [...((step as unknown as AgentPlan["steps"][number]).successCriteria ?? [])],
+                    }
+                  : {}),
+
+                ...((step as unknown as AgentPlan["steps"][number]).verificationCriteria != null
+                  ? {
+                      verificationCriteria:
+                        [...((step as unknown as AgentPlan["steps"][number]).verificationCriteria ?? [])],
+                    }
+                  : {}),
+
+                ...((step as unknown as AgentPlan["steps"][number]).failureStrategy != null
+                  ? {
+                      failureStrategy:
+                        (step as unknown as AgentPlan["steps"][number]).failureStrategy,
+                    }
+                  : {}),
+
+                ...((step as unknown as AgentPlan["steps"][number]).requiresUserInput != null
+                  ? {
+                      requiresUserInput:
+                        (step as unknown as AgentPlan["steps"][number]).requiresUserInput,
+                    }
+                  : {}),
+
                 ...(step.observation != null
                   ? {
                       observation:
@@ -480,7 +576,12 @@ export class AgentService {
 
           const executableStep =
             agentPlanExecutorService.getNextExecutableStep(
-              normalizedPlan
+              normalizedPlan,
+              buildStepRuntimeContext(
+                context,
+                currentAgentState,
+                currentPendingRegistration
+              )
             );
 
           if (

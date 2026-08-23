@@ -1,7 +1,12 @@
 import type {
+  AgentContext,
   AgentPlan,
   AgentPlanStep,
 } from "../types.js";
+
+import {
+  AgentStepContractService,
+} from "./agent-step-contract.service.js";
 
 export class AgentPlanExecutorService {
   public static getCurrentStep(
@@ -19,7 +24,12 @@ export class AgentPlanExecutorService {
   }
 
   public static getNextExecutableStep(
-    plan: AgentPlan | null | undefined
+    plan: AgentPlan | null | undefined,
+    runtimeContext?: {
+      context: AgentContext;
+      information?: Record<string, unknown>;
+      confirmations?: Record<string, boolean>;
+    }
   ): AgentPlanStep | null {
     if (!plan) {
       return null;
@@ -51,6 +61,28 @@ export class AgentPlanExecutorService {
         return null;
       }
 
+      const contract =
+        runtimeContext
+          ? AgentStepContractService.evaluate(
+              currentStep,
+              runtimeContext
+            )
+          : AgentStepContractService.evaluate(
+              currentStep,
+              {
+                context: {
+                  user: {
+                    id: "system",
+                    role: "SYSTEM",
+                  },
+                },
+              }
+            );
+
+      if (!contract.executable) {
+        return null;
+      }
+
       return currentStep;
     }
 
@@ -58,21 +90,49 @@ export class AgentPlanExecutorService {
      * If the cursor is absent or already completed, find the
      * first dependency-ready executable step.
      */
-    return (
-      plan.steps.find(
-        (step) =>
-          step.status === "PENDING" &&
-          Boolean(step.toolName) &&
-          (step.dependsOn ?? []).every(
-            (dependencyId) =>
-              plan.steps.some(
-                (dependency) =>
-                  dependency.id === dependencyId &&
-                  dependency.status === "COMPLETED"
-              )
-          )
-      ) ?? null
-    );
+    for (const step of plan.steps) {
+      if (
+        step.status !== "PENDING" ||
+        !step.toolName
+      ) {
+        continue;
+      }
+
+      const dependenciesReady =
+        (step.dependsOn ?? []).every(
+          (dependencyId) =>
+            plan.steps.some(
+              (dependency) =>
+                dependency.id === dependencyId &&
+                dependency.status === "COMPLETED"
+            )
+        );
+
+      if (!dependenciesReady) {
+        continue;
+      }
+
+      const contract =
+        AgentStepContractService.evaluate(
+          step,
+          runtimeContext ?? {
+            context: {
+              user: {
+                id: "system",
+                role: "SYSTEM",
+              },
+            },
+          }
+        );
+
+      if (!contract.executable) {
+        continue;
+      }
+
+      return step;
+    }
+
+    return null;
   }
 
   public static isExecutable(

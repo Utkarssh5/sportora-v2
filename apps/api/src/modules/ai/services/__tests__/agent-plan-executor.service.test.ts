@@ -155,6 +155,62 @@ describe("AgentPlanExecutorService", () => {
     ).toBe(false);
   });
 
+  it("does not execute a step that requires user input", () => {
+    const plan: AgentPlan = {
+      version: 1,
+      currentStepId: "step-1",
+      steps: [
+        step({
+          toolName: "register_for_tournament",
+          requiresUserInput: true,
+        }),
+      ],
+    };
+
+    expect(
+      AgentPlanExecutorService.getNextExecutableStep(
+        plan,
+        {
+          context: {
+            user: {
+              id: "player-1",
+              role: "PLAYER",
+            },
+            conversationId: "conversation-1",
+          },
+        }
+      )
+    ).toBeNull();
+  });
+
+  it("does not execute a step when required information is missing", () => {
+    const plan: AgentPlan = {
+      version: 1,
+      currentStepId: "step-1",
+      steps: [
+        step({
+          toolName: "search_tournaments",
+          requiredInformation: ["sport", "city"],
+        }),
+      ],
+    };
+
+    expect(
+      AgentPlanExecutorService.getNextExecutableStep(
+        plan,
+        {
+          context: {
+            user: {
+              id: "player-1",
+              role: "PLAYER",
+            },
+            conversationId: "conversation-1",
+          },
+        }
+      )
+    ).toBeNull();
+  });
+
   it("does not execute completed or failed steps", () => {
     const completed = step({
       status: "COMPLETED",

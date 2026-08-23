@@ -214,6 +214,61 @@ describe("AgentPlanValidatorService semantic safety", () => {
     });
   });
 
+  it("accepts execution and verification criteria", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            ...validPlan.steps[0]!,
+            requiredInformation: [
+              "sport",
+              "city",
+            ],
+            constraints: {
+              sport: "Football",
+              city: "Jaipur",
+            },
+            successCriteria: [
+              "Tournament list is returned",
+            ],
+            verificationCriteria: [
+              "Backend returned a valid tournament collection",
+            ],
+            failureStrategy: "REPLAN",
+            requiresUserInput: false,
+          },
+        ],
+      });
+
+    expect(result).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it("rejects an invalid failure strategy", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            ...validPlan.steps[0]!,
+            failureStrategy:
+              "IGNORE_FAILURE" as any,
+          },
+        ],
+      });
+
+    expect(result.valid).toBe(false);
+
+    expect(
+      result.errors
+    ).toContain(
+      "Invalid failure strategy for step search: IGNORE_FAILURE"
+    );
+  });
+
   it("accepts the canonical payment confirmation tool", () => {
     const result =
       AgentPlanValidatorService.validate({

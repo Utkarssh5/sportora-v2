@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   findAssignmentByTournamentAndCrew: vi.fn(),
   createAssignment: vi.fn(),
   findRegisteredByUserWithTournaments: vi.fn(),
+  createSettlement: vi.fn(),
+  createAchievement: vi.fn(),
 }));
 
 vi.mock("../../repositories/tournament.repository.js", () => ({
@@ -35,6 +37,18 @@ vi.mock("../../../tournamentRegistration/repositories/tournamentRegistration.rep
   tournamentRegistrationRepository: {
     findRegisteredByUserWithTournaments:
       mocks.findRegisteredByUserWithTournaments,
+  },
+}));
+
+vi.mock("../../../crewSettlement/services/crew-settlement.service.js", () => ({
+  crewSettlementService: {
+    createForVerifiedAssignment: mocks.createSettlement,
+  },
+}));
+
+vi.mock("../../../crewAchievements/services/ground-crew-achievement.service.js", () => ({
+  groundCrewAchievementService: {
+    createForVerifiedAssignment: mocks.createAchievement,
   },
 }));
 
@@ -75,11 +89,23 @@ describe("TournamentCrewAssignmentService crew lifecycle", () => {
     mocks.updateStatus.mockImplementation(
       async (_assignmentId, update) => update
     );
+
+    mocks.createSettlement.mockResolvedValue({
+      id: "settlement-1",
+    });
+
+    mocks.createAchievement.mockResolvedValue({
+      id: "achievement-1",
+    });
+
+    mocks.createAchievement.mockResolvedValue({
+      id: "achievement-1",
+    });
   });
 
   it("starts an assigned crew assignment", async () => {
     const assignment = {
-      _id: "assignment-1",
+      _id: "507f1f77bcf86cd799439011",
       tournamentId: "tournament-1",
       crewId: "crew-1",
       status: "ASSIGNED",
@@ -148,7 +174,7 @@ describe("TournamentCrewAssignmentService crew lifecycle", () => {
 
   it("allows the tournament owner to verify submitted crew work", async () => {
     const assignment = {
-      _id: "assignment-1",
+      _id: "507f1f77bcf86cd799439011",
       tournamentId: "tournament-1",
       crewId: "crew-1",
       status: "COMPLETION_SUBMITTED",
@@ -156,15 +182,30 @@ describe("TournamentCrewAssignmentService crew lifecycle", () => {
 
     mocks.findAssignmentById.mockResolvedValue(assignment);
     mocks.findTournamentById.mockResolvedValue(tournament);
+    mocks.findCrewById.mockResolvedValue(crew);
+    mocks.updateStatus.mockResolvedValue({
+      ...assignment,
+      status: "PAYOUT_PENDING",
+      verifiedAt: new Date(),
+      verifiedBy: "organizer-1",
+    });
+    mocks.createSettlement.mockResolvedValue({
+      id: "settlement-1",
+    });
+    mocks.createAchievement.mockResolvedValue({
+      id: "achievement-1",
+    });
+
 
     const result =
       await tournamentCrewAssignmentService.verifyCompletion(
-        "assignment-1",
+        "507f1f77bcf86cd799439011",
         organizer
       );
 
+
     expect(mocks.updateStatus).toHaveBeenCalledWith(
-      "assignment-1",
+      "507f1f77bcf86cd799439011",
       expect.objectContaining({
         status: "PAYOUT_PENDING",
         verifiedAt: expect.any(Date),

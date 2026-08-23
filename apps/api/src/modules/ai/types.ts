@@ -64,8 +64,26 @@ export interface AgentPlanStep {
   action: string;
   description: string;
   status: AgentStepStatus;
+
   toolName?: string;
   dependsOn?: string[];
+
+  requiredInformation?: string[];
+
+  constraints?: Record<string, unknown>;
+
+  successCriteria?: string[];
+
+  verificationCriteria?: string[];
+
+  failureStrategy?:
+    | "RETRY"
+    | "REPLAN"
+    | "ASK_USER"
+    | "STOP";
+
+  requiresUserInput?: boolean;
+
   observation?: string;
 }
 

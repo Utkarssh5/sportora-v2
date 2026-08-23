@@ -59,6 +59,21 @@ export class PaymentService {
       );
     }
 
+    if (new Date() > tournament.registrationDeadline) {
+      throw new Error(
+        "Registration deadline has passed."
+      );
+    }
+
+    if (
+      tournament.registeredParticipants >=
+      tournament.maxParticipants
+    ) {
+      throw new Error(
+        "Tournament registration is full."
+      );
+    }
+
     if (tournament.entryFee <= 0) {
       throw new Error(
         "This tournament does not require payment."

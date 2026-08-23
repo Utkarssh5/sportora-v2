@@ -111,6 +111,30 @@ export class AgentPlanValidatorService {
           );
         }
       }
+
+      /*
+       * Failure strategy is another deterministic safety boundary.
+       *
+       * The planner may choose how to recover, but it may only use
+       * strategies explicitly supported by the runtime.
+       */
+      const allowedFailureStrategies = new Set([
+        "RETRY",
+        "REPLAN",
+        "ASK_USER",
+        "STOP",
+      ]);
+
+      if (
+        step.failureStrategy != null &&
+        !allowedFailureStrategies.has(
+          step.failureStrategy
+        )
+      ) {
+        errors.push(
+          `Invalid failure strategy for step ${step.id}: ${step.failureStrategy}`
+        );
+      }
     }
 
     if (

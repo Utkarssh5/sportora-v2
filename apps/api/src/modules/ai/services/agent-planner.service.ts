@@ -40,6 +40,22 @@ Rules:
 - Start with the first executable/reasoning step.
 - Do not mark newly generated steps as COMPLETED or FAILED.
 
+For every plan step when applicable:
+- Define the required information needed by the step.
+- Define relevant constraints.
+- Define measurable success criteria.
+- Define backend verification criteria.
+- Define what should happen if the step fails.
+- Use RETRY only for potentially transient failures.
+- Use REPLAN when another strategy may achieve the goal.
+- Use ASK_USER when required information cannot be safely inferred.
+- Use STOP when continuing would be unsafe or impossible.
+- requiresUserInput must be true only when explicit player interaction is required.
+- Success criteria describe what must be observed.
+- Verification criteria describe what the backend must confirm.
+- Never use success criteria as proof that an operation actually succeeded.
+- Never use planner output as proof of payment or registration success.
+
 Allowed player tools:
 search_tournaments
 get_tournament
@@ -73,11 +89,46 @@ function planSchema() {
               enum: ["PENDING"],
             },
             toolName: { type: "string" },
+
             dependsOn: {
               type: "array",
               items: { type: "string" },
             },
+
+            requiredInformation: {
+              type: "array",
+              items: { type: "string" },
+            },
+
+            constraints: {
+              type: "object",
+            },
+
+            successCriteria: {
+              type: "array",
+              items: { type: "string" },
+            },
+
+            verificationCriteria: {
+              type: "array",
+              items: { type: "string" },
+            },
+
+            failureStrategy: {
+              type: "string",
+              enum: [
+                "RETRY",
+                "REPLAN",
+                "ASK_USER",
+                "STOP",
+              ],
+            },
+
+            requiresUserInput: {
+              type: "boolean",
+            },
           },
+
           required: [
             "id",
             "action",
@@ -150,6 +201,49 @@ export class AgentPlannerService {
                                         [...step.dependsOn],
                                     }
                                   : {}),
+
+                                ...(step.requiredInformation != null
+                                  ? {
+                                      requiredInformation:
+                                        [...step.requiredInformation],
+                                    }
+                                  : {}),
+
+                                ...(step.constraints != null
+                                  ? {
+                                      constraints:
+                                        { ...step.constraints },
+                                    }
+                                  : {}),
+
+                                ...(step.successCriteria != null
+                                  ? {
+                                      successCriteria:
+                                        [...step.successCriteria],
+                                    }
+                                  : {}),
+
+                                ...(step.verificationCriteria != null
+                                  ? {
+                                      verificationCriteria:
+                                        [...step.verificationCriteria],
+                                    }
+                                  : {}),
+
+                                ...(step.failureStrategy != null
+                                  ? {
+                                      failureStrategy:
+                                        step.failureStrategy,
+                                    }
+                                  : {}),
+
+                                ...(step.requiresUserInput != null
+                                  ? {
+                                      requiresUserInput:
+                                        step.requiresUserInput,
+                                    }
+                                  : {}),
+
                                 ...(step.observation != null
                                   ? {
                                       observation:
