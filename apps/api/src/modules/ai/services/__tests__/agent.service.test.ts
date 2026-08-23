@@ -974,6 +974,182 @@ describe("AgentService reference integration", () => {
     expect(result.success).toBe(true);
   });
 
+  it("blocks a tool that conflicts with the current persisted plan step", async () => {
+    mocks.generateContent.mockReset();
+
+    mocks.getAgentState.mockResolvedValue({
+      activeIntent: "TOURNAMENT_REGISTRATION",
+      lastTool: "search_tournaments",
+      goal: {
+        type: "REGISTER_TOURNAMENT",
+        status: "PAYMENT_READY",
+        plan: {
+          version: 1,
+          currentStepId: "create-payment-order",
+          steps: [
+            {
+              id: "create-payment-order",
+              action: "CREATE_PAYMENT_ORDER",
+              description: "Create the payment order.",
+              status: "PENDING",
+              toolName: "create_payment_order",
+            },
+          ],
+        },
+      },
+    });
+
+    mocks.evaluateWorkflow.mockReturnValue({
+      decision: "CONTINUE",
+      reason:
+        "The current plan step permits only its assigned tool.",
+      allowedNextTool:
+        "create_payment_order",
+    });
+
+    mocks.isToolAllowed.mockImplementation(
+      (evaluation, toolName) =>
+        evaluation.allowedNextTool === toolName
+    );
+
+    mocks.generateContent.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          name: "cancel_registration",
+          args: {
+            registrationId: "registration-1",
+          },
+        },
+      ],
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                functionCall: {
+                  name: "cancel_registration",
+                  args: {
+                    registrationId: "registration-1",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const result =
+      await AgentService.chat(
+        "cancel my registration",
+        context,
+        "user"
+      );
+
+    expect(
+      mocks.isToolAllowed
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowedNextTool:
+          "create_payment_order",
+      }),
+      "cancel_registration"
+    );
+
+    expect(
+      mocks.cancelRegistration
+    ).not.toHaveBeenCalled();
+
+    expect(result.success).toBe(true);
+  });
+
+  it("blocks all tools when the current persisted plan step requires observation", async () => {
+    mocks.generateContent.mockReset();
+
+    mocks.getAgentState.mockResolvedValue({
+      activeIntent: "TOURNAMENT_REGISTRATION",
+      lastTool: "create_payment_order",
+      goal: {
+        type: "REGISTER_TOURNAMENT",
+        status: "PAYMENT_READY",
+        plan: {
+          version: 1,
+          currentStepId: "verify-payment",
+          steps: [
+            {
+              id: "verify-payment",
+              action: "VERIFY_PAYMENT",
+              description:
+                "Verify the actual payment result.",
+              status: "PENDING",
+            },
+          ],
+        },
+      },
+    });
+
+    mocks.evaluateWorkflow.mockReturnValue({
+      decision: "CONTINUE",
+      reason:
+        "The current plan step requires an observation or state transition before another tool can execute.",
+      toolsBlocked: true,
+    });
+
+    mocks.isToolAllowed.mockImplementation(
+      (evaluation) =>
+        evaluation.toolsBlocked !== true
+    );
+
+    mocks.generateContent.mockResolvedValueOnce({
+      functionCalls: [
+        {
+          name: "create_payment_order",
+          args: {
+            tournamentId: "tournament-qa-1",
+          },
+        },
+      ],
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                functionCall: {
+                  name: "create_payment_order",
+                  args: {
+                    tournamentId: "tournament-qa-1",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const result =
+      await AgentService.chat(
+        "create the payment order again",
+        context,
+        "user"
+      );
+
+    expect(
+      mocks.isToolAllowed
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolsBlocked: true,
+      }),
+      "create_payment_order"
+    );
+
+    expect(
+      mocks.createPaymentOrder
+    ).not.toHaveBeenCalled();
+
+    expect(result.success).toBe(true);
+  });
+
   it("blocks a tool that is not allowed by the current workflow", async () => {
     mocks.generateContent.mockReset();
 

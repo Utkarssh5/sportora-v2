@@ -1,4 +1,5 @@
 import { aiRepository } from "../repositories/ai.repository.js";
+import { AgentPlanService } from "./agent-plan.service.js";
 
 import type {
   AgentContext,
@@ -35,6 +36,11 @@ export class AgentStateService {
       return;
     }
 
+    const previousState =
+      await aiRepository.getAgentState(
+        context.conversationId
+      );
+
     const state = result.success
       ? this.deriveState(
           toolName,
@@ -44,6 +50,83 @@ export class AgentStateService {
           toolName,
           result
         );
+
+    const previousPlan =
+      previousState?.goal?.plan
+        ? {
+            version:
+              previousState.goal.plan.version,
+            steps:
+              previousState.goal.plan.steps.map(
+                (step) => ({
+                  id: step.id,
+                  action: step.action,
+                  description:
+                    step.description,
+                  status: step.status,
+                  ...(step.toolName != null
+                    ? {
+                        toolName:
+                          step.toolName,
+                      }
+                    : {}),
+                  ...(step.dependsOn
+                    ? {
+                        dependsOn:
+                          [...step.dependsOn],
+                      }
+                    : {}),
+                  ...(step.observation != null
+                    ? {
+                        observation:
+                          step.observation,
+                      }
+                    : {}),
+                })
+              ),
+            ...(previousState.goal.plan.currentStepId != null
+              ? {
+                  currentStepId:
+                    previousState.goal.plan.currentStepId,
+                }
+              : {}),
+            ...(previousState.goal.plan.createdAt != null
+              ? {
+                  createdAt:
+                    previousState.goal.plan.createdAt,
+                }
+              : {}),
+            ...(previousState.goal.plan.updatedAt != null
+              ? {
+                  updatedAt:
+                    previousState.goal.plan.updatedAt,
+                }
+              : {}),
+          }
+        : undefined;
+
+    const currentPlan =
+      previousPlan ??
+      (state.goal
+        ? AgentPlanService.createPlan(
+            state.goal.type
+          )
+        : undefined);
+
+    const updatedPlan =
+      this.updatePlanAfterTool(
+        currentPlan,
+        toolName,
+        result.success,
+        result.message
+      );
+
+    if (state.goal && updatedPlan) {
+      state.goal = {
+        ...state.goal,
+        plan: updatedPlan,
+      };
+    }
 
     await aiRepository.updateAgentState(
       context.conversationId,
@@ -375,7 +458,7 @@ export class AgentStateService {
 
         return {
           activeIntent:
-            "PAYMENT" as AgentIntent,
+            "TOURNAMENT_REGISTRATION" as AgentIntent,
           activeEntity:
             tournamentId
               ? {
@@ -385,7 +468,7 @@ export class AgentStateService {
               : null,
           goal:
             this.createGoal(
-              "PAYMENT",
+              "REGISTER_TOURNAMENT",
               "PAYMENT_PENDING",
               "Complete payment for the selected tournament registration.",
               {
@@ -496,6 +579,69 @@ export class AgentStateService {
           lastTool: toolName,
         };
     }
+  }
+
+  private static updatePlanAfterTool(
+    plan: AgentGoal["plan"],
+    toolName: string,
+    success: boolean,
+    observation?: string
+  ): AgentGoal["plan"] {
+    if (!plan) {
+      return undefined;
+    }
+
+    const updatedSteps =
+      plan.steps.map((step) => {
+        if (step.toolName !== toolName) {
+          return step;
+        }
+
+        return {
+          ...step,
+          status: success
+            ? "COMPLETED" as const
+            : "FAILED" as const,
+          ...(observation
+            ? { observation }
+            : {}),
+        };
+      });
+
+    /*
+     * After a tool completes, move the plan cursor to the next
+     * pending step whose dependencies are satisfied.
+     *
+     * Tool-less steps such as SELECT_TOURNAMENT are checkpoints:
+     * they become the current step but are not marked completed
+     * automatically.
+     *
+     * This is deliberately dependency-driven rather than based on
+     * the previous currentStepId. That allows the cursor to move
+     * forward after the tool that occupied the previous step has
+     * completed.
+     */
+    const nextStep =
+      updatedSteps.find(
+        (step) =>
+          step.status === "PENDING" &&
+          (step.dependsOn ?? []).every(
+            (dependency) =>
+              updatedSteps.find(
+                (candidate) =>
+                  candidate.id === dependency
+              )?.status === "COMPLETED"
+          )
+      );
+
+    return {
+      ...plan,
+      steps: updatedSteps,
+      ...(nextStep
+        ? { currentStepId: nextStep.id }
+        : {}),
+      updatedAt: new Date(),
+    };
   }
 
   private static createGoal(

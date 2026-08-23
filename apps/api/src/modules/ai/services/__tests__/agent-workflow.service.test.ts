@@ -9,6 +9,7 @@ import {
 } from "../agent-workflow.service.js";
 
 import type {
+  AgentPlanStep,
   AgentState,
 } from "../../types.js";
 
@@ -23,6 +24,26 @@ function state(
       status,
       description: "Register player for tournament.",
       lastObservation: "Test observation.",
+    },
+  };
+}
+
+function plannedState(
+  currentStepId: string,
+  steps: AgentPlanStep[]
+): AgentState {
+  return {
+    activeIntent: "TOURNAMENT_REGISTRATION",
+    candidateTournaments: [],
+    goal: {
+      type: "REGISTER_TOURNAMENT",
+      status: "PAYMENT_READY",
+      description: "Register player for tournament.",
+      plan: {
+        version: 1,
+        steps,
+        currentStepId,
+      },
     },
   };
 }
@@ -136,5 +157,76 @@ describe("AgentWorkflowService", () => {
         "search_tournaments"
       )
     ).toBe(true);
+  });
+
+  it("allows the tool defined by the current plan step", () => {
+    const evaluation =
+      AgentWorkflowService.evaluate(
+        plannedState("create-payment-order", [
+          {
+            id: "create-payment-order",
+            action: "CREATE_PAYMENT_ORDER",
+            description: "Create the payment order.",
+            status: "PENDING",
+            toolName: "create_payment_order",
+          },
+        ])
+      );
+
+    expect(evaluation.allowedNextTool).toBe(
+      "create_payment_order"
+    );
+
+    expect(
+      AgentWorkflowService.isToolAllowed(
+        evaluation,
+        "create_payment_order"
+      )
+    ).toBe(true);
+  });
+
+  it("blocks a tool that does not match the current plan step", () => {
+    const evaluation =
+      AgentWorkflowService.evaluate(
+        plannedState("create-payment-order", [
+          {
+            id: "create-payment-order",
+            action: "CREATE_PAYMENT_ORDER",
+            description: "Create the payment order.",
+            status: "PENDING",
+            toolName: "create_payment_order",
+          },
+        ])
+      );
+
+    expect(
+      AgentWorkflowService.isToolAllowed(
+        evaluation,
+        "get_tournament"
+      )
+    ).toBe(false);
+  });
+
+  it("blocks tool execution when the current plan step requires observation", () => {
+    const evaluation =
+      AgentWorkflowService.evaluate(
+        plannedState("verify-payment", [
+          {
+            id: "verify-payment",
+            action: "VERIFY_PAYMENT",
+            description: "Verify the actual payment result.",
+            status: "PENDING",
+          },
+        ])
+      );
+
+    expect(evaluation.allowedNextTool).toBeUndefined();
+
+    expect(
+      AgentWorkflowService.isToolAllowed(
+        evaluation,
+        "create_payment_order"
+      )
+    ).toBe(false);
   });
 });

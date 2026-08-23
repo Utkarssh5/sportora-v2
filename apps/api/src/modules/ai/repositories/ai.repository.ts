@@ -65,6 +65,21 @@ export const aiRepository = {
         completedSteps?: string[];
         pendingAction?: string | null;
         lastObservation?: string | null;
+        plan?: {
+          version?: number;
+          steps?: Array<{
+            id: string;
+            action: string;
+            description: string;
+            status?: string;
+            toolName?: string;
+            dependsOn?: string[];
+            observation?: string;
+          }>;
+          currentStepId?: string | null;
+          createdAt?: Date | null;
+          updatedAt?: Date | null;
+        } | null;
       } | null;
       lastTool?: string | null;
       lastUserMessage?: string | null;
@@ -113,6 +128,36 @@ export const aiRepository = {
     );
   },
 
+
+  async updateAgentPlan(
+    conversationId: string,
+    plan: {
+      version: number;
+      steps: Array<{
+        id: string;
+        action: string;
+        description: string;
+        status?: string;
+        toolName?: string;
+        dependsOn?: string[];
+        observation?: string;
+      }>;
+      currentStepId?: string;
+      createdAt?: Date;
+      updatedAt?: Date;
+    }
+  ) {
+    return AIConversationModel.findOneAndUpdate(
+      { conversationId },
+      {
+        $set: {
+          "agentState.goal.plan": plan,
+          "agentState.updatedAt": new Date(),
+        },
+      },
+      { new: true }
+    );
+  },
 
   async setPendingRegistration(
     conversationId: string,

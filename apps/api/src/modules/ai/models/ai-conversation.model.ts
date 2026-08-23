@@ -127,6 +127,69 @@ const aiConversationSchema = new Schema(
           default: null,
         },
 
+        plan: {
+          version: {
+            type: Number,
+            default: 1,
+          },
+
+          steps: {
+            type: [
+              {
+                id: {
+                  type: String,
+                  required: true,
+                },
+                action: {
+                  type: String,
+                  required: true,
+                },
+                description: {
+                  type: String,
+                  required: true,
+                },
+                status: {
+                  type: String,
+                  enum: [
+                    "PENDING",
+                    "COMPLETED",
+                    "FAILED",
+                  ],
+                  default: "PENDING",
+                },
+                toolName: {
+                  type: String,
+                  default: null,
+                },
+                dependsOn: {
+                  type: [String],
+                  default: [],
+                },
+                observation: {
+                  type: String,
+                  default: null,
+                },
+              },
+            ],
+            default: [],
+          },
+
+          currentStepId: {
+            type: String,
+            default: null,
+          },
+
+          createdAt: {
+            type: Date,
+            default: null,
+          },
+
+          updatedAt: {
+            type: Date,
+            default: null,
+          },
+        },
+
         updatedAt: {
           type: Date,
           default: null,

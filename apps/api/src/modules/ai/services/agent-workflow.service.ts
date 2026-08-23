@@ -2,10 +2,19 @@ import type {
   AgentWorkflowStage,
 } from "../types.js";
 
+type WorkflowPlanStep = {
+  id: string;
+  toolName?: string | null;
+};
+
 type WorkflowState = {
   goal?: {
     status: AgentWorkflowStage;
     lastObservation?: string | null;
+    plan?: {
+      steps: WorkflowPlanStep[];
+      currentStepId?: string | null;
+    } | null;
   } | null | undefined;
 };
 
@@ -18,6 +27,7 @@ export interface AgentWorkflowEvaluation {
   decision: AgentWorkflowDecision;
   reason: string;
   allowedNextTool?: string;
+  toolsBlocked?: boolean;
 }
 
 export class AgentWorkflowService {
@@ -25,6 +35,10 @@ export class AgentWorkflowService {
     evaluation: AgentWorkflowEvaluation,
     toolName: string
   ): boolean {
+    if (evaluation.toolsBlocked) {
+      return false;
+    }
+
     if (!evaluation.allowedNextTool) {
       return true;
     }
@@ -46,6 +60,31 @@ export class AgentWorkflowService {
 
     const status: AgentWorkflowStage =
       goal.status;
+
+    const currentStep =
+      goal.plan?.steps.find(
+        (step) =>
+          step.id === goal.plan?.currentStepId
+      );
+
+    if (currentStep) {
+      if (currentStep.toolName) {
+        return {
+          decision: "CONTINUE",
+          reason:
+            "The current plan step permits only its assigned tool.",
+          allowedNextTool:
+            currentStep.toolName,
+        };
+      }
+
+      return {
+        decision: "CONTINUE",
+        reason:
+          "The current plan step requires an observation or state transition before another tool can execute.",
+        toolsBlocked: true,
+      };
+    }
 
     switch (status) {
       case "WAITING_CONFIRMATION":

@@ -59,6 +59,24 @@ export type AgentStepStatus =
   | "COMPLETED"
   | "FAILED";
 
+export interface AgentPlanStep {
+  id: string;
+  action: string;
+  description: string;
+  status: AgentStepStatus;
+  toolName?: string;
+  dependsOn?: string[];
+  observation?: string;
+}
+
+export interface AgentPlan {
+  version: number;
+  steps: AgentPlanStep[];
+  currentStepId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface AgentGoal {
   type: AgentGoalType;
   status: AgentWorkflowStage;
@@ -67,6 +85,7 @@ export interface AgentGoal {
   requiredInformation?: string[];
   completedSteps?: string[];
   pendingAction?: string;
+  plan?: AgentPlan;
   lastObservation?: string;
   updatedAt?: Date;
 }

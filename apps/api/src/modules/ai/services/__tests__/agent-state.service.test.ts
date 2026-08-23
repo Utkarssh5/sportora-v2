@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../repositories/ai.repository.js", () => ({
   aiRepository: {
     updateAgentState: vi.fn(),
+    getAgentState: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -28,6 +29,9 @@ const context: AgentContext = {
 describe("AgentStateService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.mocked(aiRepository.getAgentState)
+      .mockResolvedValue(null);
   });
 
   it("stores tournament candidates after search", async () => {
@@ -86,6 +90,142 @@ describe("AgentStateService", () => {
         }),
         lastTool: "search_tournaments",
       }
+    );
+  });
+
+  it("advances the existing registration plan after a successful tool", async () => {
+    vi.mocked(aiRepository.getAgentState).mockResolvedValueOnce({
+      goal: {
+        type: "REGISTER_TOURNAMENT",
+        status: "DISCOVERING",
+        description: "Register for a tournament",
+        plan: {
+          version: 1,
+          steps: [
+            {
+              id: "search-tournaments",
+              action: "SEARCH_TOURNAMENTS",
+              description: "Find tournaments",
+              status: "PENDING",
+              toolName: "search_tournaments",
+            },
+            {
+              id: "select-tournament",
+              action: "SELECT_TOURNAMENT",
+              description: "Select a tournament",
+              status: "PENDING",
+            },
+            {
+              id: "get-tournament",
+              action: "GET_TOURNAMENT",
+              description: "Verify tournament",
+              status: "PENDING",
+              toolName: "get_tournament",
+              dependsOn: [
+                "search-tournaments",
+                "select-tournament",
+              ],
+            },
+          ],
+          currentStepId: "search-tournaments",
+        },
+      },
+    } as never);
+
+    const result: AgentToolResult = {
+      success: true,
+      data: {
+        tournaments: [],
+      },
+    };
+
+    await agentStateService.recordToolResult(
+      "search_tournaments",
+      result,
+      context
+    );
+
+    expect(updateAgentState).toHaveBeenCalledWith(
+      "conversation-1",
+      expect.objectContaining({
+        goal: expect.objectContaining({
+          plan: expect.objectContaining({
+            currentStepId: "select-tournament",
+            steps: expect.arrayContaining([
+              expect.objectContaining({
+                id: "search-tournaments",
+                status: "COMPLETED",
+              }),
+              expect.objectContaining({
+                id: "select-tournament",
+                status: "PENDING",
+              }),
+            ]),
+          }),
+        }),
+      })
+    );
+  });
+
+  it("does not treat payment order creation as payment verification", async () => {
+    vi.mocked(aiRepository.getAgentState).mockResolvedValueOnce({
+      goal: {
+        type: "REGISTER_TOURNAMENT",
+        status: "PAYMENT_READY",
+        description: "Register for a tournament",
+        plan: {
+          version: 1,
+          steps: [
+            {
+              id: "create-payment-order",
+              action: "CREATE_PAYMENT_ORDER",
+              description: "Create payment order",
+              status: "PENDING",
+              toolName: "create_payment_order",
+            },
+            {
+              id: "verify-payment",
+              action: "VERIFY_PAYMENT",
+              description: "Verify payment",
+              status: "PENDING",
+              dependsOn: ["create-payment-order"],
+            },
+          ],
+          currentStepId: "create-payment-order",
+        },
+      },
+    } as never);
+
+    const result: AgentToolResult = {
+      success: true,
+      data: {
+        tournamentId: "tournament-1",
+        orderId: "order-1",
+      },
+    };
+
+    await agentStateService.recordToolResult(
+      "create_payment_order",
+      result,
+      context
+    );
+
+    const call = vi.mocked(updateAgentState).mock.calls[0]?.[1];
+
+    expect(call?.goal?.plan).toEqual(
+      expect.objectContaining({
+        currentStepId: "verify-payment",
+        steps: expect.arrayContaining([
+          expect.objectContaining({
+            id: "create-payment-order",
+            status: "COMPLETED",
+          }),
+          expect.objectContaining({
+            id: "verify-payment",
+            status: "PENDING",
+          }),
+        ]),
+      })
     );
   });
 
@@ -161,7 +301,7 @@ describe("AgentStateService", () => {
     );
   });
 
-  it("stores payment intent", async () => {
+  it("keeps payment order creation inside the registration goal", async () => {
     const result: AgentToolResult = {
       success: true,
       data: {
@@ -179,13 +319,13 @@ describe("AgentStateService", () => {
     expect(updateAgentState).toHaveBeenCalledWith(
       "conversation-1",
       {
-        activeIntent: "PAYMENT",
+        activeIntent: "TOURNAMENT_REGISTRATION",
         activeEntity: {
           type: "TOURNAMENT",
           id: "tournament-1",
         },
         goal: expect.objectContaining({
-          type: "PAYMENT",
+          type: "REGISTER_TOURNAMENT",
           status: "PAYMENT_PENDING",
           pendingAction: "COMPLETE_PAYMENT",
           completedSteps: [
