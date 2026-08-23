@@ -21,6 +21,7 @@ type WorkflowState = {
 export type AgentWorkflowDecision =
   | "CONTINUE"
   | "ASK_USER"
+  | "REPLAN"
   | "STOP";
 
 export interface AgentWorkflowEvaluation {
@@ -61,13 +62,42 @@ export class AgentWorkflowService {
     const status: AgentWorkflowStage =
       goal.status;
 
-    const currentStep =
-      goal.plan?.steps.find(
-        (step) =>
-          step.id === goal.plan?.currentStepId
-      );
+    const plan = goal.plan;
 
-    if (currentStep) {
+    if (plan) {
+      if (!Array.isArray(plan.steps) || plan.steps.length === 0) {
+        return {
+          decision: "STOP",
+          reason:
+            "The persisted workflow plan is invalid because it contains no steps.",
+          toolsBlocked: true,
+        };
+      }
+
+      if (!plan.currentStepId) {
+        return {
+          decision: "STOP",
+          reason:
+            "The persisted workflow plan is invalid because no current step is selected.",
+          toolsBlocked: true,
+        };
+      }
+
+      const currentStep =
+        plan.steps.find(
+          (step) =>
+            step.id === plan.currentStepId
+        );
+
+      if (!currentStep) {
+        return {
+          decision: "STOP",
+          reason:
+            "The persisted workflow plan is invalid because the current step does not exist.",
+          toolsBlocked: true,
+        };
+      }
+
       if (currentStep.toolName) {
         return {
           decision: "CONTINUE",
@@ -120,10 +150,10 @@ export class AgentWorkflowService {
 
       case "FAILED":
         return {
-          decision: "CONTINUE",
+          decision: "REPLAN",
           reason:
             goal.lastObservation ||
-            "The previous action failed and the agent may attempt safe recovery.",
+            "The previous action failed and the agent should create a recovery plan.",
         };
 
       case "COMPLETED":

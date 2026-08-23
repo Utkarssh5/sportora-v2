@@ -1,5 +1,4 @@
 import { aiRepository } from "../repositories/ai.repository.js";
-import { AgentPlanService } from "./agent-plan.service.js";
 
 import type {
   AgentContext,
@@ -48,7 +47,8 @@ export class AgentStateService {
         )
       : this.deriveFailureState(
           toolName,
-          result
+          result,
+          previousState
         );
 
     const previousPlan =
@@ -106,12 +106,7 @@ export class AgentStateService {
         : undefined;
 
     const currentPlan =
-      previousPlan ??
-      (state.goal
-        ? AgentPlanService.createPlan(
-            state.goal.type
-          )
-        : undefined);
+      previousPlan;
 
     const updatedPlan =
       this.updatePlanAfterTool(
@@ -136,7 +131,10 @@ export class AgentStateService {
 
   private static deriveFailureState(
     toolName: string,
-    result: AgentToolResult
+    result: AgentToolResult,
+    previousState: Awaited<
+      ReturnType<typeof aiRepository.getAgentState>
+    >
   ) {
     const observation =
       result.message ??
@@ -152,162 +150,77 @@ export class AgentStateService {
         ? "NEEDS_CLARIFICATION" as const
         : "FAILED" as const;
 
-    switch (toolName) {
-      case "search_tournaments":
-        return {
-          activeIntent:
-            "TOURNAMENT_DISCOVERY" as AgentIntent,
-          goal:
-            this.createGoal(
-              "DISCOVER_TOURNAMENT",
-              status,
-              "Find suitable tournaments for the player.",
-              {
-                lastObservation: observation,
-                ...(needsClarification
-                  ? { pendingAction: "CLARIFY_SEARCH" }
+    const previousGoal =
+      previousState?.goal;
+
+    if (previousGoal) {
+      const preservedGoal =
+        JSON.parse(
+          JSON.stringify(previousGoal)
+        ) as AgentGoal;
+
+      return {
+        ...(previousState?.activeIntent
+          ? {
+              activeIntent:
+                previousState.activeIntent,
+            }
+          : {}),
+        activeEntity:
+          previousState?.activeEntity?.type &&
+          previousState?.activeEntity?.id
+            ? {
+                type:
+                  previousState.activeEntity.type,
+                id:
+                  previousState.activeEntity.id,
+                ...(previousState.activeEntity.label != null
+                  ? {
+                      label:
+                        previousState.activeEntity.label,
+                    }
                   : {}),
               }
-            ),
-          lastTool: toolName,
-        };
-
-      case "get_tournament":
-        return {
-          activeIntent:
-            "TOURNAMENT_DETAILS" as AgentIntent,
-          goal:
-            this.createGoal(
-              "VIEW_TOURNAMENT",
-              status,
-              "Understand the selected tournament.",
-              {
-                lastObservation: observation,
-                ...(needsClarification
-                  ? { pendingAction: "CLARIFY_TOURNAMENT" }
-                  : {}),
+            : null,
+        candidateTournaments:
+          previousState?.candidateTournaments
+            ? JSON.parse(
+                JSON.stringify(
+                  previousState.candidateTournaments
+                )
+              )
+            : [],
+        goal: {
+          ...preservedGoal,
+          status,
+          lastObservation:
+            observation,
+          ...(needsClarification
+            ? {
+                pendingAction:
+                  preservedGoal.pendingAction ??
+                  "CLARIFY",
               }
-            ),
-          lastTool: toolName,
-        };
-
-      case "register_for_tournament":
-        return {
-          activeIntent:
-            "TOURNAMENT_REGISTRATION" as AgentIntent,
-          goal:
-            this.createGoal(
-              "REGISTER_TOURNAMENT",
-              status,
-              "Register the player for the selected tournament.",
-              {
-                lastObservation: observation,
-                ...(needsClarification
-                  ? { pendingAction: "CLARIFY_REGISTRATION" }
-                  : {}),
-              }
-            ),
-          lastTool: toolName,
-        };
-
-      case "confirm_pending_registration":
-      case "create_payment_order":
-        return {
-          activeIntent:
-            "PAYMENT" as AgentIntent,
-          goal:
-            this.createGoal(
-              "PAYMENT",
-              status,
-              "Complete payment for the selected tournament registration.",
-              {
-                lastObservation: observation,
-                ...(needsClarification
-                  ? { pendingAction: "CLARIFY_PAYMENT" }
-                  : {}),
-              }
-            ),
-          lastTool: toolName,
-        };
-
-      case "get_my_registrations":
-        return {
-          activeIntent:
-            "REGISTRATION_STATUS" as AgentIntent,
-          goal:
-            this.createGoal(
-              "CHECK_REGISTRATIONS",
-              status,
-              "Check the player's tournament registrations.",
-              {
-                lastObservation: observation,
-              }
-            ),
-          lastTool: toolName,
-        };
-
-      case "cancel_registration":
-        return {
-          activeIntent:
-            "REGISTRATION_CANCELLATION" as AgentIntent,
-          goal:
-            this.createGoal(
-              "CANCEL_REGISTRATION",
-              status,
-              "Cancel the selected tournament registration.",
-              {
-                lastObservation: observation,
-              }
-            ),
-          lastTool: toolName,
-        };
-
-      case "get_my_profile":
-        return {
-          activeIntent:
-            "PROFILE" as AgentIntent,
-          goal:
-            this.createGoal(
-              "VIEW_PROFILE",
-              status,
-              "Retrieve the player's Sportora profile.",
-              {
-                lastObservation: observation,
-              }
-            ),
-          lastTool: toolName,
-        };
-
-      case "get_match_details":
-      case "get_tournament_matches":
-        return {
-          activeIntent:
-            "MATCH" as AgentIntent,
-          goal:
-            this.createGoal(
-              "CHECK_MATCH",
-              status,
-              "Retrieve match information for the player.",
-              {
-                lastObservation: observation,
-              }
-            ),
-          lastTool: toolName,
-        };
-
-      default:
-        return {
-          goal: {
-            type: "VIEW_PROFILE" as AgentGoalType,
-            status,
-            description:
-              "Complete the player's requested operation.",
-            lastObservation:
-              observation,
-          },
-          lastTool: toolName,
-        };
+            : {}),
+          updatedAt: new Date(),
+        },
+        lastTool: toolName,
+      };
     }
+
+    return {
+      goal: {
+        type:
+          "DISCOVER_TOURNAMENT" as AgentGoalType,
+        status,
+        description:
+          observation,
+        lastObservation:
+          observation,
+        updatedAt: new Date(),
+      },
+      lastTool: toolName,
+    };
   }
 
   private static deriveState(
@@ -398,16 +311,18 @@ export class AgentStateService {
                 )
               : this.createGoal(
                   "REGISTER_TOURNAMENT",
-                  "COMPLETED",
+                  "VERIFYING",
                   "Register the player for the selected tournament.",
                   {
                     completedSteps: [
                       "SELECT_TOURNAMENT",
                       "REGISTRATION",
                     ],
+                    pendingAction:
+                      "VERIFY_REGISTRATION",
                     lastObservation:
                       result.message ??
-                      "Tournament registration completed.",
+                      "Registration request completed; backend verification is required.",
                   }
                 ),
           lastTool: toolName,

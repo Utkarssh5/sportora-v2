@@ -341,6 +341,20 @@ describe("AgentStateService", () => {
   });
 
   it("stores a clarification state for a failed tool", async () => {
+    vi.mocked(aiRepository.getAgentState).mockResolvedValueOnce({
+      activeIntent: "TOURNAMENT_DETAILS",
+      candidateTournaments: [] as any,
+      goal: {
+        type: "VIEW_TOURNAMENT",
+        status: "VIEWING_DETAILS",
+        description:
+          "Understand the selected tournament.",
+        constraints: {},
+        requiredInformation: [],
+        completedSteps: [],
+      },
+    });
+
     const result: AgentToolResult = {
       success: false,
       message: "Tournament not found.",
@@ -354,16 +368,16 @@ describe("AgentStateService", () => {
 
     expect(updateAgentState).toHaveBeenCalledWith(
       "conversation-1",
-      {
+      expect.objectContaining({
         activeIntent: "TOURNAMENT_DETAILS",
         goal: expect.objectContaining({
           type: "VIEW_TOURNAMENT",
           status: "NEEDS_CLARIFICATION",
-          pendingAction: "CLARIFY_TOURNAMENT",
           lastObservation: "Tournament not found.",
+          pendingAction: "CLARIFY",
         }),
         lastTool: "get_tournament",
-      }
+      })
     );
   });
 

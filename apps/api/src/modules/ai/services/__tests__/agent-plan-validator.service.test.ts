@@ -83,6 +83,25 @@ describe("AgentPlanValidatorService", () => {
     );
   });
 
+  it("rejects dependencies that reference a later step", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            ...validPlan.steps[0]!,
+            dependsOn: ["register"],
+          },
+          validPlan.steps[1]!,
+        ],
+      });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Step search must depend only on an earlier step: register."
+    );
+  });
+
   it("rejects dependency cycles", () => {
     const result =
       AgentPlanValidatorService.validate({
@@ -113,5 +132,109 @@ describe("AgentPlanValidatorService", () => {
     expect(result.errors).toContain(
       "Current step does not exist: does-not-exist"
     );
+  });
+});
+
+describe("AgentPlanValidatorService semantic safety", () => {
+  it("rejects an unknown planner action", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            ...validPlan.steps[0]!,
+            action: "MARK_PAYMENT_SUCCESS",
+          },
+        ],
+      });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Unknown plan action: MARK_PAYMENT_SUCCESS"
+    );
+  });
+
+  it("rejects a mismatched action and tool", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            ...validPlan.steps[0]!,
+            action: "SEARCH_TOURNAMENTS",
+            toolName: "create_payment_order",
+          },
+        ],
+      });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Plan action SEARCH_TOURNAMENTS must use tool search_tournaments."
+    );
+  });
+
+  it("rejects a verification step with a tool", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            ...validPlan.steps[0]!,
+            action: "VERIFY_PAYMENT",
+            toolName: "create_payment_order",
+          },
+        ],
+      });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Plan action VERIFY_PAYMENT must not define a toolName."
+    );
+  });
+
+  it("accepts a tool-less verification checkpoint", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            id: "verify-payment",
+            action: "VERIFY_PAYMENT",
+            description:
+              "Verify actual payment state.",
+            status: "PENDING",
+          },
+        ],
+        currentStepId: "verify-payment",
+      });
+
+    expect(result).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it("accepts the canonical payment confirmation tool", () => {
+    const result =
+      AgentPlanValidatorService.validate({
+        ...validPlan,
+        steps: [
+          {
+            id: "confirm-payment",
+            action: "CONFIRM_PAYMENT",
+            description:
+              "Confirm player intent.",
+            status: "PENDING",
+            toolName:
+              "confirm_pending_registration",
+          },
+        ],
+        currentStepId: "confirm-payment",
+      });
+
+    expect(result).toEqual({
+      valid: true,
+      errors: [],
+    });
   });
 });

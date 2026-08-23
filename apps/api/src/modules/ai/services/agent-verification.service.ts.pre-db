@@ -1,0 +1,165 @@
+import type {
+  AgentContext,
+  AgentGoal,
+  AgentToolResult,
+} from "../types.js";
+
+export interface AgentVerificationResult {
+  verified: boolean;
+  reason: string;
+}
+
+export class AgentVerificationService {
+  public static verifyGoal(
+    goal: AgentGoal,
+    _toolName: string,
+    result: AgentToolResult,
+    _context: AgentContext
+  ): AgentVerificationResult {
+    if (!result.success) {
+      return {
+        verified: false,
+        reason:
+          result.message ??
+          "The tool operation failed.",
+      };
+    }
+
+    switch (goal.type) {
+      case "DISCOVER_TOURNAMENT":
+        return this.verifyTournamentDiscovery(result);
+
+      case "VIEW_TOURNAMENT":
+        return this.verifyTournamentView(result);
+
+      case "CHECK_REGISTRATIONS":
+        return this.verifyRegistrations(result);
+
+      case "CANCEL_REGISTRATION":
+        return this.verifyCancellation(result);
+
+      case "VIEW_PROFILE":
+        return {
+          verified: result.data != null,
+          reason:
+            result.data != null
+              ? "Player profile returned by the backend."
+              : "Player profile was not returned by the backend.",
+        };
+
+      case "CHECK_MATCH":
+        return {
+          verified: result.data != null,
+          reason:
+            result.data != null
+              ? "Match information returned by the backend."
+              : "Match information was not returned by the backend.",
+        };
+
+      case "REGISTER_TOURNAMENT":
+        return {
+          verified: false,
+          reason:
+            "Tournament registration requires backend verification before completion.",
+        };
+
+      case "PAYMENT":
+        return {
+          verified: false,
+          reason:
+            "Payment requires backend verification before completion.",
+        };
+
+      default:
+        return {
+          verified: false,
+          reason:
+            `No deterministic verifier exists for ${goal.type}.`,
+        };
+    }
+  }
+
+  private static verifyTournamentDiscovery(
+    result: AgentToolResult
+  ): AgentVerificationResult {
+    const data = result.data as any;
+
+    if (!Array.isArray(data?.tournaments)) {
+      return {
+        verified: false,
+        reason:
+          "Tournament discovery returned no verifiable tournament list.",
+      };
+    }
+
+    return {
+      verified: true,
+      reason:
+        "Tournament discovery returned a verified tournament list.",
+    };
+  }
+
+  private static verifyTournamentView(
+    result: AgentToolResult
+  ): AgentVerificationResult {
+    const data = result.data as any;
+
+    if (!(data?.tournament ?? data)) {
+      return {
+        verified: false,
+        reason:
+          "Tournament details were not returned by the backend.",
+      };
+    }
+
+    return {
+      verified: true,
+      reason:
+        "Tournament details were returned by the backend.",
+    };
+  }
+
+  private static verifyRegistrations(
+    result: AgentToolResult
+  ): AgentVerificationResult {
+    if (result.data == null) {
+      return {
+        verified: false,
+        reason:
+          "Registration state was not returned by the backend.",
+      };
+    }
+
+    return {
+      verified: true,
+      reason:
+        "Registration state was returned by the backend.",
+    };
+  }
+
+  private static verifyCancellation(
+    result: AgentToolResult
+  ): AgentVerificationResult {
+    const data = result.data as any;
+
+    if (
+      data?.success === false ||
+      data?.cancelled === false
+    ) {
+      return {
+        verified: false,
+        reason:
+          "The backend did not verify registration cancellation.",
+      };
+    }
+
+    return {
+      verified: true,
+      reason:
+        "The backend verified registration cancellation.",
+    };
+  }
+}
+
+export const agentVerificationService =
+  AgentVerificationService;

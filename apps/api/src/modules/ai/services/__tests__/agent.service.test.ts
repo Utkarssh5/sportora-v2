@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getMessages: vi.fn(),
   saveMessage: vi.fn(),
   getAgentState: vi.fn(),
+  updateAgentState: vi.fn(),
   getPendingRegistration: vi.fn(),
 
   recordUserMessage: vi.fn(),
@@ -28,6 +29,8 @@ const mocks = vi.hoisted(() => ({
 
   evaluateWorkflow: vi.fn(),
   isToolAllowed: vi.fn(),
+
+  createDynamicPlan: vi.fn(),
 }));
 
 vi.mock("../gemini.service.js", () => ({
@@ -99,6 +102,9 @@ vi.mock("../../repositories/ai.repository.js", () => ({
     getAgentState:
       mocks.getAgentState,
 
+    updateAgentState:
+      mocks.updateAgentState,
+
     getPendingRegistration:
       mocks.getPendingRegistration,
   },
@@ -111,6 +117,13 @@ vi.mock("../agent-workflow.service.js", () => ({
 
     isToolAllowed:
       mocks.isToolAllowed,
+  },
+}));
+
+vi.mock("../agent-planner.service.js", () => ({
+  agentPlannerService: {
+    createDynamicPlan:
+      mocks.createDynamicPlan,
   },
 }));
 
@@ -159,6 +172,10 @@ describe("AgentService reference integration", () => {
 
     mocks.getAgentState.mockResolvedValue(null);
 
+    mocks.updateAgentState.mockResolvedValue(
+      undefined
+    );
+
     mocks.getPendingRegistration.mockResolvedValue(
       null
     );
@@ -170,6 +187,24 @@ describe("AgentService reference integration", () => {
     mocks.recordToolResult.mockResolvedValue(
       undefined
     );
+
+    mocks.createDynamicPlan.mockResolvedValue({
+      version: 1,
+      steps: [
+        {
+          id: "search-tournaments",
+          action: "SEARCH_TOURNAMENTS",
+          description:
+            "Find suitable tournaments.",
+          status: "PENDING",
+          toolName: "search_tournaments",
+        },
+      ],
+      currentStepId:
+        "search-tournaments",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
     mocks.evaluateWorkflow.mockReturnValue({
       allowedNextTool: null,
@@ -1224,6 +1259,228 @@ describe("AgentService reference integration", () => {
     );
 
     expect(result.success).toBe(true);
+  });
+
+
+  it("replans dynamically after a failed workflow action", async () => {
+    mocks.getAgentState
+      .mockResolvedValueOnce({
+        goal: {
+          type: "REGISTER_TOURNAMENT",
+          status: "FAILED",
+          description:
+            "Register me in a football tournament in Jaipur.",
+          lastObservation:
+            "The selected tournament registration deadline has passed.",
+          plan: {
+            version: 1,
+            steps: [
+              {
+                id: "register",
+                action: "REGISTER_TOURNAMENT",
+                description:
+                  "Register in the selected tournament.",
+                status: "FAILED",
+                toolName:
+                  "register_for_tournament",
+              },
+            ],
+            currentStepId: "register",
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        goal: {
+          type: "REGISTER_TOURNAMENT",
+          status: "DISCOVERING",
+          description:
+            "Register me in a football tournament in Jaipur.",
+          plan: {
+            version: 2,
+            steps: [
+              {
+                id: "search-alternative",
+                action: "SEARCH_TOURNAMENTS",
+                description:
+                  "Find another eligible tournament.",
+                status: "PENDING",
+                toolName:
+                  "search_tournaments",
+              },
+            ],
+            currentStepId:
+              "search-alternative",
+          },
+        },
+      });
+
+    mocks.createDynamicPlan.mockResolvedValue({
+      version: 2,
+      steps: [
+        {
+          id: "search-alternative",
+          action: "SEARCH_TOURNAMENTS",
+          description:
+            "Find another eligible tournament.",
+          status: "PENDING",
+          toolName: "search_tournaments",
+        },
+      ],
+      currentStepId:
+        "search-alternative",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    mocks.evaluateWorkflow
+      .mockReturnValueOnce({
+        decision: "REPLAN",
+        reason:
+          "The previous action failed and recovery is required.",
+      })
+      .mockReturnValue({
+        decision: "CONTINUE",
+        reason: "Recovery plan is ready.",
+        allowedNextTool:
+          "search_tournaments",
+      });
+
+    mocks.generateContent.mockResolvedValue({
+      text: "",
+      functionCalls: [
+        {
+          name: "search_tournaments",
+          args: {
+            city: "Jaipur",
+            sport: "Football",
+          },
+        },
+      ],
+    });
+
+    await AgentService.chat(
+      "Find another tournament and register me.",
+      context,
+      "user"
+    );
+
+    expect(
+      mocks.createDynamicPlan
+    ).toHaveBeenCalledOnce();
+
+    expect(
+      mocks.createDynamicPlan
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "REGISTER_TOURNAMENT",
+        status: "FAILED",
+        lastObservation:
+          "The selected tournament registration deadline has passed.",
+      }),
+      expect.objectContaining({
+        conversationId:
+          "conversation-1",
+      })
+    );
+
+    expect(
+      mocks.updateAgentState
+    ).toHaveBeenCalledWith(
+      "conversation-1",
+      expect.objectContaining({
+        goal: expect.objectContaining({
+          plan: expect.objectContaining({
+            version: 2,
+          }),
+        }),
+      })
+    );
+  });
+
+  it("creates and persists a dynamic plan when the goal has no plan", async () => {
+    mocks.getAgentState
+      .mockResolvedValueOnce({
+        goal: {
+          type: "REGISTER_TOURNAMENT",
+          status: "DISCOVERING",
+          description:
+            "Register me in the best football tournament in Jaipur.",
+        },
+      })
+      .mockResolvedValueOnce({
+        goal: {
+          type: "REGISTER_TOURNAMENT",
+          status: "DISCOVERING",
+          description:
+            "Register me in the best football tournament in Jaipur.",
+          plan: {
+            version: 1,
+            steps: [
+              {
+                id: "search-tournaments",
+                action: "SEARCH_TOURNAMENTS",
+                description:
+                  "Find suitable tournaments.",
+                status: "PENDING",
+                toolName:
+                  "search_tournaments",
+              },
+            ],
+            currentStepId:
+              "search-tournaments",
+          },
+        },
+      });
+
+    mocks.generateContent.mockResolvedValue({
+      text: "",
+      functionCalls: [
+        {
+          name: "search_tournaments",
+          args: {
+            city: "Jaipur",
+            sport: "Football",
+          },
+        },
+      ],
+    });
+
+
+    mocks.evaluateWorkflow.mockReturnValue({
+      decision: "CONTINUE",
+      reason: "Plan is ready.",
+    });
+
+    await AgentService.chat(
+      "Find a football tournament in Jaipur.",
+      context,
+      "user"
+    );
+
+    expect(
+      mocks.createDynamicPlan
+    ).toHaveBeenCalledOnce();
+
+    expect(
+      mocks.createDynamicPlan
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "REGISTER_TOURNAMENT",
+        status: "DISCOVERING",
+      }),
+      expect.objectContaining({
+        conversationId:
+          "conversation-1",
+      })
+    );
+
+    expect(
+      mocks.getAgentState
+    ).toHaveBeenCalled();
+
+    expect(
+      mocks.evaluateWorkflow
+    ).toHaveBeenCalled();
   });
 
 });

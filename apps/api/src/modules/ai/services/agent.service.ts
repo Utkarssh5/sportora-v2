@@ -14,9 +14,14 @@ import { aiRepository } from "../repositories/ai.repository.js";
 import { agentStateService } from "./agent-state.service.js";
 import { agentWorkflowService } from "./agent-workflow.service.js";
 import { referenceResolverService } from "./reference-resolver.service.js";
+import { agentPlannerService } from "./agent-planner.service.js";
+import { agentVerificationService } from "./agent-verification.service.js";
+import { agentPlanExecutorService } from "./agent-plan-executor.service.js";
 
 import type {
   AgentContext,
+  AgentGoal,
+  AgentPlan,
   AgentToolResult,
 } from "../types.js";
 
@@ -233,6 +238,104 @@ export class AgentService {
           ? `${systemPrompt}\n\n${runtimeContext}`
           : systemPrompt;
 
+        /*
+         * Create a dynamic execution plan when:
+         *
+         * 1. the workflow has a goal but no persisted plan, or
+         * 2. the previous tool failed and the agent must recover.
+         *
+         * A failed workflow is deliberately replanned from the
+         * latest persisted observation instead of blindly retrying
+         * the failed step.
+         */
+        if (
+          currentAgentState?.goal &&
+          (
+            !currentAgentState.goal.plan ||
+            currentAgentState.goal.status === "FAILED"
+          )
+        ) {
+          const goalForPlanner =
+            JSON.parse(
+              JSON.stringify(
+                currentAgentState.goal
+              )
+            ) as NonNullable<
+              typeof currentAgentState.goal
+            >;
+
+          const dynamicPlan =
+            await agentPlannerService.createDynamicPlan(
+              goalForPlanner as any,
+              context
+            );
+
+          await aiRepository.updateAgentState(
+            conversationId,
+            {
+              goal: {
+                type: goalForPlanner.type!,
+                status: goalForPlanner.status,
+                ...(goalForPlanner.description != null
+                  ? {
+                      description:
+                        goalForPlanner.description,
+                    }
+                  : {}),
+                ...(goalForPlanner.constraints != null
+                  ? {
+                      constraints:
+                        goalForPlanner.constraints,
+                    }
+                  : {}),
+                ...(goalForPlanner.requiredInformation != null
+                  ? {
+                      requiredInformation:
+                        goalForPlanner.requiredInformation,
+                    }
+                  : {}),
+                ...(goalForPlanner.completedSteps != null
+                  ? {
+                      completedSteps:
+                        goalForPlanner.completedSteps,
+                    }
+                  : {}),
+                ...(goalForPlanner.pendingAction != null
+                  ? {
+                      pendingAction:
+                        goalForPlanner.pendingAction,
+                    }
+                  : {}),
+                ...(goalForPlanner.lastObservation != null
+                  ? {
+                      lastObservation:
+                        goalForPlanner.lastObservation,
+                    }
+                  : {}),
+                plan: dynamicPlan,
+              },
+            }
+          );
+
+          currentAgentState =
+            await aiRepository.getAgentState(
+              conversationId
+            );
+        }
+
+        /*
+         * Evaluate the refreshed workflow state before asking
+         * Gemini for the next action.
+         *
+         * This keeps planning and workflow state synchronized:
+         * dynamic plans are persisted first, then the deterministic
+         * workflow evaluator observes the latest state.
+         */
+        agentWorkflowService.evaluate(
+          currentAgentState
+        );
+
+
       const response =
         await gemini.models.generateContent({
           model: GEMINI_MODEL,
@@ -319,24 +422,107 @@ export class AgentService {
 
 
         /*
-         * Enforce the workflow evaluator before executing
-         * any tool requested by the model.
+         * Evaluate the workflow first.
          *
-         * The evaluator is the runtime guardrail. When a
-         * workflow restricts the next action, unrelated tools
-         * must never reach their backend handlers.
+         * The workflow evaluator remains the authoritative
+         * deterministic gate for the current backend state.
          */
         const currentWorkflowEvaluation =
           agentWorkflowService.evaluate(
             currentAgentState
           );
 
-        if (
-          !agentWorkflowService.isToolAllowed(
+        /*
+         * Enforce the persisted dynamic plan as an additional
+         * execution constraint.
+         *
+         * Gemini may propose an action, but it cannot bypass
+         * the persisted goal-oriented plan.
+         */
+        const persistedPlan =
+          currentAgentState?.goal?.plan;
+
+        let planBlockedMessage:
+          string | null = null;
+
+        if (persistedPlan) {
+          const normalizedPlan: AgentPlan = {
+            version: persistedPlan.version,
+            steps: persistedPlan.steps.map(
+              (step) => ({
+                id: step.id,
+                action: step.action,
+                description: step.description,
+                status: step.status,
+                dependsOn: Array.isArray(step.dependsOn)
+                  ? [...step.dependsOn]
+                  : [],
+                ...(step.toolName != null
+                  ? {
+                      toolName: step.toolName,
+                    }
+                  : {}),
+                ...(step.observation != null
+                  ? {
+                      observation:
+                        step.observation,
+                    }
+                  : {}),
+              })
+            ),
+            ...(persistedPlan.currentStepId != null
+              ? {
+                  currentStepId:
+                    persistedPlan.currentStepId,
+                }
+              : {}),
+          };
+
+          const executableStep =
+            agentPlanExecutorService.getNextExecutableStep(
+              normalizedPlan
+            );
+
+          if (
+            executableStep &&
+            executableStep.toolName !== toolName
+          ) {
+            planBlockedMessage =
+              `The current agent plan requires ${executableStep.toolName} before ${toolName}.`;
+          }
+
+          /*
+           * A plan checkpoint without an executable tool means
+           * the agent must observe/reason before another tool.
+           */
+          if (
+            !executableStep &&
+            normalizedPlan.steps.some(
+              (step) =>
+                step.status === "PENDING" &&
+                !step.toolName
+            )
+          ) {
+            planBlockedMessage =
+              "The current agent plan requires an observation or state transition before another tool can execute.";
+          }
+        }
+
+        /*
+         * Enforce the workflow evaluator before executing
+         * any tool requested by the model.
+         *
+         * The evaluator was already computed above so the
+         * persisted-plan gate and workflow gate share the
+         * same evaluation for this tool request.
+         */
+        const workflowAllowsTool =
+          agentWorkflowService.isToolAllowed(
             currentWorkflowEvaluation,
             toolName
-          )
-        ) {
+          );
+
+        if (!workflowAllowsTool) {
           const allowedTool =
             currentWorkflowEvaluation.allowedNextTool;
 
@@ -354,6 +540,20 @@ export class AgentService {
           return {
             success: true,
             message: blockedMessage,
+            conversationId,
+          };
+        }
+
+        if (planBlockedMessage) {
+          await aiRepository.saveMessage(
+            conversationId,
+            "model",
+            planBlockedMessage
+          );
+
+          return {
+            success: true,
+            message: planBlockedMessage,
             conversationId,
           };
         }
@@ -511,6 +711,128 @@ export class AgentService {
           agentWorkflowService.evaluate(
             currentAgentState
           );
+
+        /*
+         * Verify the observed backend result before allowing
+         * a goal to be considered completed.
+         *
+         * The verifier is deterministic and must never rely
+         * on the LLM claiming that an operation succeeded.
+         */
+        const observedGoal =
+          currentAgentState?.goal;
+
+        if (
+          observedGoal &&
+          observedGoal.type &&
+          result.success
+        ) {
+          const verification =
+            await agentVerificationService.verifyGoal(
+              observedGoal as AgentGoal,
+              toolName,
+              result,
+              context
+            );
+
+          if (
+            verification.verified
+          ) {
+            await aiRepository.updateAgentState(
+              conversationId,
+              {
+                goal: {
+                  type: observedGoal.type,
+                  status: "COMPLETED",
+                  ...(observedGoal.description != null
+                    ? {
+                        description:
+                          observedGoal.description,
+                      }
+                    : {}),
+                  ...(observedGoal.constraints != null
+                    ? {
+                        constraints:
+                          observedGoal.constraints,
+                      }
+                    : {}),
+                  ...(observedGoal.requiredInformation != null
+                    ? {
+                        requiredInformation:
+                          observedGoal.requiredInformation,
+                      }
+                    : {}),
+                  ...(observedGoal.completedSteps != null
+                    ? {
+                        completedSteps:
+                          observedGoal.completedSteps,
+                      }
+                    : {}),
+                  ...(observedGoal.pendingAction != null
+                    ? {
+                        pendingAction:
+                          observedGoal.pendingAction,
+                      }
+                    : {}),
+                  lastObservation:
+                    verification.reason,
+                },
+              }
+            );
+
+            currentAgentState =
+              await aiRepository.getAgentState(
+                conversationId
+              );
+          }
+        }
+
+        if (
+          workflowEvaluation.decision === "REPLAN" &&
+          currentAgentState?.goal
+        ) {
+          const goalForPlanner =
+            JSON.parse(
+              JSON.stringify(
+                currentAgentState.goal
+              )
+            );
+
+          const dynamicPlan =
+            await agentPlannerService.createDynamicPlan(
+              goalForPlanner,
+              context
+            );
+
+          await aiRepository.updateAgentState(
+            conversationId,
+            {
+              goal: {
+                ...goalForPlanner,
+                plan: dynamicPlan,
+              },
+            }
+          );
+
+          currentAgentState =
+            await aiRepository.getAgentState(
+              conversationId
+            );
+
+          currentPendingRegistration =
+            await aiRepository.getPendingRegistration(
+              conversationId
+            );
+
+          /*
+           * The new plan is persisted.
+           *
+           * Do not execute a recovery tool directly here.
+           * The next Gemini iteration must observe the new
+           * plan and request the appropriate tool.
+           */
+          continue;
+        }
 
         if (
           workflowEvaluation.decision === "ASK_USER" ||

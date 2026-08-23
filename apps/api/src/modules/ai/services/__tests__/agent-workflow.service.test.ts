@@ -98,7 +98,7 @@ describe("AgentWorkflowService", () => {
         state("FAILED")
       );
 
-    expect(result.decision).toBe("CONTINUE");
+    expect(result.decision).toBe("REPLAN");
   });
 
   it("stops a completed workflow", () => {
