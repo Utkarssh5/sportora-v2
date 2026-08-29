@@ -38,7 +38,7 @@ export class OrganizerVerificationService {
       await organizerVerificationRepository.findByOrganizer(organizerId);
 
     if (!request) {
-      throw new Error("Verification request not found");
+      return null;
     }
 
     return request;

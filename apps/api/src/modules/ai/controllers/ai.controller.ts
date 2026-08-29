@@ -74,6 +74,7 @@ export const handleAIAssistant = async (
       success: result.success,
       message: result.message,
       conversationId: result.conversationId,
+      data: result.data,
     });
 
   } catch (error: any) {

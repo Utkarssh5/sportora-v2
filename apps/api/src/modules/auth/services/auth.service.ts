@@ -47,11 +47,11 @@ export class AuthService {
         organizationName: data.organizationName!,
         governmentIdType: data.governmentIdType!,
         governmentId: data.governmentId!,
-        documentUrl: data.documentUrl!,
+        ...(data.documentUrl ? { documentUrl: data.documentUrl } : {}),
         address: data.address!,
         city: data.city!,
         state: data.state!,
-        pincode: data.pincode!,
+        ...(data.pincode ? { pincode: data.pincode } : {}),
         status: VerificationStatus.PENDING,
       });
     }

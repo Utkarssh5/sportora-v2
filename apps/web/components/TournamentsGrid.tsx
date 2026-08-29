@@ -543,7 +543,7 @@ function TournamentsGridContent({
   const headerY = useTransform(
     scrollYProgress,
     [0.08, 0.35],
-    [70, -20],
+    [70, 0],
   );
 
   const headerOpacity = useTransform(
@@ -1122,11 +1122,11 @@ function TournamentsGridContent({
   return (
     <section
       id="tournaments"
-      className="relative z-10 mx-auto max-w-7xl overflow-hidden px-6 py-28 sm:py-36"
+      className="relative z-10 mx-auto max-w-7xl overflow-hidden px-4 py-10 sm:px-6 sm:py-14"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-20 top-10 select-none text-[16rem] font-black leading-none tracking-[-0.08em] text-white/[0.025] sm:text-[24rem]"
+        className="pointer-events-none absolute -right-20 top-10 select-none text-[9rem] font-black leading-none tracking-[-0.08em] text-white/[0.025] sm:text-[13rem]"
       >
         03
       </div>
@@ -1136,7 +1136,7 @@ function TournamentsGridContent({
           y: headerY,
           opacity: headerOpacity,
         }}
-        className="relative z-10 mb-16 flex flex-col justify-between gap-8 lg:flex-row lg:items-end"
+        className="relative z-10 mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end"
       >
         <div className="max-w-4xl">
           <div className="mb-5 flex items-center gap-3">
@@ -1187,7 +1187,7 @@ function TournamentsGridContent({
         </div>
       </motion.div>
 
-      <div className="mt-8 mb-10 lg:mb-12">
+      <div className="mt-4 mb-10 lg:mb-12">
         <div className="mb-4 flex items-center justify-between px-1">
           <div className="flex items-center gap-3">
             <span className="h-1.5 w-1.5 rounded-full bg-[#00ff66] shadow-[0_0_12px_rgba(0,255,102,0.8)]" />
@@ -1295,7 +1295,7 @@ function TournamentsGridContent({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex min-h-[300px] items-center justify-center rounded-[32px] border border-white/10 bg-white/[0.02] backdrop-blur-xl"
+          className="flex min-h-[300px] items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.02] backdrop-blur-xl"
         >
           <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-[#00ff66]">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -2191,14 +2191,6 @@ function TournamentCard({
     sportFallbackImages[sportKey] ||
     sportFallbackImages.football;
 
-  console.log('🔥 SPORT IMAGE DEBUG:', {
-    title: item.title,
-    sport: item.sport,
-    sportKey,
-    venuePhotos: item.venuePhotos,
-    selectedImage: image,
-  });
-
   const isFull =
     capacity > 0 && registered >= capacity;
 
@@ -2225,18 +2217,15 @@ function TournamentCard({
       }}
       className="group relative"
     >
-      <div className="absolute -left-1 top-8 hidden text-[12px] font-black tracking-[0.3em] text-white/55 lg:block">
-        EVENT / 0{index + 1}
-      </div>
 
-      <div className="grid overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.025] backdrop-blur-xl transition-all duration-500 group-hover:border-[#00ff66]/30 group-hover:shadow-[0_25px_80px_rgba(0,255,102,0.08)] md:grid-cols-[1.15fr_0.85fr]">
-        <div className="relative h-[300px] overflow-hidden md:h-[430px]">
+      <div className="grid overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.025] backdrop-blur-xl transition-all duration-500 group-hover:border-[#00ff66]/30 group-hover:shadow-[0_25px_80px_rgba(0,255,102,0.08)] md:grid-cols-[1.4fr_0.8fr]">
+        <div className="relative min-h-[280px] overflow-hidden">
           <motion.img
             src={image}
             alt={item.title}
             whileHover={{ scale: 1.08 }}
             transition={{ duration: 0.8 }}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
 
           <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-black/10 to-[#080b10]" />
@@ -2297,28 +2286,28 @@ function TournamentCard({
           </div>
         </div>
 
-        <div className="flex flex-col justify-between p-7 sm:p-9">
+        <div className="flex flex-col justify-between p-4 sm:p-5">
           <div>
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <span className="text-[12px] font-black tracking-[0.3em] text-white/45">
                 SPORTS / EVENT
               </span>
 
-              <span className="text-5xl font-black tracking-[-0.08em] text-white/[0.06]">
+              <span className="text-3xl font-black tracking-[-0.08em] text-white/[0.06]">
                 0{index + 1}
               </span>
             </div>
 
-            <h3 className="max-w-xl text-3xl font-black uppercase leading-[0.95] tracking-[-0.04em] text-white transition-colors duration-300 group-hover:text-[#00ff66] sm:text-4xl">
+            <h3 className="max-w-xl text-2xl font-black uppercase leading-[0.95] tracking-[-0.04em] text-white transition-colors duration-300 group-hover:text-[#00ff66] sm:text-3xl">
               {item.title}
             </h3>
 
-            <p className="mt-5 text-sm leading-6 text-white/55">
+            <p className="mt-3 text-xs leading-5 text-white/55">
               {item.format} • {item.type} tournament in{' '}
               {item.city}, {item.state}.
             </p>
 
-            <div className="mt-7 space-y-3 border-y border-white/10 py-5 text-xs text-white/50">
+            <div className="mt-4 space-y-2 border-y border-white/10 py-3 text-xs text-white/50">
               <div className="flex items-center gap-3">
                 <MapPin className="h-4 w-4 shrink-0 text-[#00ff66]" />
 
@@ -2349,7 +2338,7 @@ function TournamentCard({
           </div>
 
           <div className="mt-8">
-            <div className="mb-3 flex items-center justify-between text-[12px] font-black tracking-[0.2em] text-white/45">
+            <div className="mb-2 flex items-center justify-between text-[10px] font-black tracking-[0.2em] text-white/45">
               <span>ARENA CAPACITY</span>
 
               <span>
@@ -2372,7 +2361,7 @@ function TournamentCard({
               />
             </div>
 
-            <div className="mt-5 flex items-end justify-between gap-4">
+            <div className="mt-3 flex items-end justify-between gap-3">
               <div>
                 <div className="text-[12px] font-black tracking-[0.2em] text-white/45">
                   ENTRY / PRIZE POOL
@@ -2396,7 +2385,7 @@ function TournamentCard({
               <button
                 onClick={onSelect}
                 disabled={isFull}
-                className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-[12px] font-black uppercase tracking-wider text-white transition-all duration-300 hover:border-[#00ff66] hover:bg-[#00ff66] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white transition-all duration-300 hover:border-[#00ff66] hover:bg-[#00ff66] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isFull
                   ? 'FULL'

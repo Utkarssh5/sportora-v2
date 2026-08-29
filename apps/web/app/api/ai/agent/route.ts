@@ -1,80 +1,86 @@
-import { NextResponse } from 'next/server';
-import { authorize } from '@/lib/middleware';
-import { searchTournamentsTool, registerTournamentTool, checkOrganizerStatusTool } from '@/lib/ai/tools';
-import { getSessionHistory, saveMessageToHistory } from '@/lib/ai/memory';
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+const API_URL =
+  process.env.SPORTORA_API_URL || "http://localhost:5000";
 
 export async function POST(req: Request) {
-  const auth = authorize(req);
-  if (!auth.isAuthorized) return auth.response;
-
   try {
-    const { prompt, sessionId } = await req.json();
+    const cookieStore = await cookies();
+
+    const accessToken =
+      cookieStore.get("accessToken")?.value;
+
+    if (!accessToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Authentication required.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+
+    const prompt =
+      typeof body?.prompt === "string"
+        ? body.prompt.trim()
+        : "";
+
+    const conversationId =
+      typeof body?.conversationId === "string" &&
+      body.conversationId.trim()
+        ? body.conversationId.trim()
+        : undefined;
 
     if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Prompt is required.",
+        },
+        { status: 400 }
+      );
     }
 
-    const currentSession = sessionId || auth.user.userId;
-    const lowerPrompt = prompt.toLowerCase();
+    const response = await fetch(
+      `${API_URL}/api/v1/ai/chat`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          ...(conversationId
+            ? { conversationId }
+            : {}),
+        }),
+        cache: "no-store",
+      }
+    );
 
-    let toolOutput = "";
-    let actionExecuted = "GENERAL_CONVERSATION";
+    const data = await response.json();
 
-    // 1. Intent Classification & LangChain Tool Invocation
-    if (lowerPrompt.includes("search") || lowerPrompt.includes("find") || lowerPrompt.includes("dikhao") || lowerPrompt.includes("tournament")) {
-      actionExecuted = "SEARCH_TOURNAMENTS";
-      
-      let sport = undefined;
-      if (lowerPrompt.includes("football")) sport = "Football";
-      if (lowerPrompt.includes("badminton")) sport = "Badminton";
-      if (lowerPrompt.includes("cricket")) sport = "Cricket";
-
-      let city = undefined;
-      if (lowerPrompt.includes("jaipur")) city = "Jaipur";
-      if (lowerPrompt.includes("lucknow")) city = "Lucknow";
-      if (lowerPrompt.includes("delhi")) city = "Delhi";
-
-      const res = await searchTournamentsTool.invoke({ sport, city });
-      toolOutput = typeof res === 'string' ? res : JSON.stringify(res);
-    } 
-    else if (lowerPrompt.includes("register") || lowerPrompt.includes("join") || lowerPrompt.includes("book")) {
-      actionExecuted = "REGISTER_TOURNAMENT";
-      
-      const res = await registerTournamentTool.invoke({
-        tournamentId: "65f1a2b3c4d5e6f7a8b9c0d1",
-        userId: auth.user.userId,
-        teamName: "Sportora Titans",
-        contactPhone: "9876543210"
-      });
-      toolOutput = typeof res === 'string' ? res : JSON.stringify(res);
-    }
-    else if (lowerPrompt.includes("status") || lowerPrompt.includes("verification")) {
-      actionExecuted = "CHECK_VERIFICATION_STATUS";
-      
-      const res = await checkOrganizerStatusTool.invoke({ userId: auth.user.userId });
-      toolOutput = typeof res === 'string' ? res : JSON.stringify(res);
-    }
-
-    // 2. Format Response Output
-    let finalAnswer = "";
-    if (toolOutput) {
-      finalAnswer = `[Sportora Agent Executed: ${actionExecuted}]\nResult: ${toolOutput}`;
-    } else {
-      finalAnswer = `I am your Sportora AI Assistant! You can ask me to search tournaments in any city, check your registration eligibility, or check your organizer verification status.`;
-    }
-
-    // 3. Save to History
-    saveMessageToHistory(currentSession, 'user', prompt);
-    saveMessageToHistory(currentSession, 'assistant', finalAnswer);
-
-    return NextResponse.json({
-      success: true,
-      actionTaken: actionExecuted,
-      reply: finalAnswer,
-      conversationHistory: getSessionHistory(currentSession)
+    return NextResponse.json(data, {
+      status: response.status,
     });
+  } catch (error: any) {
+    console.error(
+      "Sportora AI proxy error:",
+      error
+    );
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error?.message ||
+          "Unable to connect to Sportora AI.",
+      },
+      { status: 500 }
+    );
   }
 }

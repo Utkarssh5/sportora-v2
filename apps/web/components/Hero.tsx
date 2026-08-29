@@ -99,7 +99,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-[calc(100vh-76px)] overflow-hidden"
+      className="relative min-h-[calc(78vh-76px)] overflow-hidden"
     >
       {/* Moving atmospheric glow */}
       <motion.div
@@ -108,7 +108,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
           x: parallaxX,
           y: backgroundY,
         }}
-        className="pointer-events-none absolute left-1/2 top-[38%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#00ff66]/10 blur-[120px]"
+        className="pointer-events-none absolute left-1/2 top-[38%] h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#00ff66]/10 blur-[120px]"
       />
 
       {/* Outer arena ring */}
@@ -118,7 +118,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
           y: ringY,
           x: parallaxX,
         }}
-        className="pointer-events-none absolute left-1/2 top-[45%] -z-0 h-[650px] w-[650px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#00ff66]/10"
+        className="pointer-events-none absolute left-1/2 top-[45%] -z-0 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#00ff66]/10"
       />
 
       {/* Rotating ring */}
@@ -133,7 +133,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
           repeat: Infinity,
           ease: 'linear',
         }}
-        className="pointer-events-none absolute left-1/2 top-[45%] -z-0 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#00ff66]/10"
+        className="pointer-events-none absolute left-1/2 top-[45%] -z-0 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#00ff66]/10"
       />
 
       {/* Dashed inner ring */}
@@ -149,11 +149,11 @@ export default function Hero({ query, setQuery }: HeroProps) {
           repeat: Infinity,
           ease: 'linear',
         }}
-        className="pointer-events-none absolute left-1/2 top-[45%] -z-0 h-[350px] w-[350px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#00ff66]/15"
+        className="pointer-events-none absolute left-1/2 top-[45%] -z-0 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#00ff66]/15"
       />
 
       {/* AI badge */}
-      <div className="relative z-20 mx-auto flex max-w-7xl justify-center px-6 pt-16 sm:pt-20 lg:pt-24">
+      <div className="relative z-20 mx-auto flex max-w-7xl justify-center px-6 pt-24 sm:pt-28 lg:pt-32">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -180,7 +180,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
           scale: contentScale,
           opacity: contentOpacity,
         }}
-        className="relative z-20 mx-auto flex max-w-7xl flex-col items-center px-6 pt-10 text-center sm:pt-12 lg:pt-14"
+        className="relative z-20 mx-auto flex max-w-7xl flex-col items-center px-6 pt-6 text-center sm:pt-8 lg:pt-10"
       >
         <motion.p
           initial={{ opacity: 0, y: 20 }}
@@ -202,7 +202,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
           style={{
             x: parallaxX,
           }}
-          className="max-w-6xl text-6xl font-black leading-[0.88] tracking-[-0.06em] text-white sm:text-7xl md:text-8xl lg:text-[9.5rem]"
+          className="max-w-6xl text-5xl font-black leading-[0.9] tracking-[-0.055em] text-white sm:text-6xl md:text-7xl lg:text-[7rem]"
         >
           FIND YOUR
           <br />
@@ -231,7 +231,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.8 }}
-          className="mt-8 max-w-2xl text-sm leading-7 text-white/40 sm:text-base sm:leading-8"
+          className="mt-5 max-w-2xl text-sm leading-7 text-white/40 sm:text-base sm:leading-8"
         >
           Discover tournaments. Build your team. Host events.
           <br className="hidden sm:block" />
@@ -247,7 +247,7 @@ export default function Hero({ query, setQuery }: HeroProps) {
             duration: 0.8,
             ease: [0.22, 1, 0.36, 1],
           }}
-          className="mt-10 w-full max-w-2xl"
+          className="mt-7 w-full max-w-xl"
         >
           <div className="group relative">
             <div className="absolute -inset-1 rounded-2xl bg-[#00ff66]/10 opacity-0 blur-xl transition duration-500 group-focus-within:opacity-100" />

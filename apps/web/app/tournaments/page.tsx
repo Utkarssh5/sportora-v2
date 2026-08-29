@@ -550,17 +550,7 @@ function TournamentsPageContent() {
                 value={sport}
                 onChange={(event) => {
                   const value = event.target.value;
-                  const nextSportConfig = sportsConfig.find(
-                    (item) => item.sport === value,
-                  );
-                  const nextCompetition =
-                    nextSportConfig?.competitions?.[0]?.type || '';
-                  const nextFormat =
-                    nextSportConfig?.competitions?.[0]?.supportedFormats?.[0] || '';
-
                   setSport(value);
-                  setCompetitionType(nextCompetition);
-                  setFormat(nextFormat);
 
                   updateFilters(
                     search,
@@ -568,8 +558,12 @@ function TournamentsPageContent() {
                     city,
                     value,
                     status,
-                    nextCompetition,
-                    nextFormat,
+                    competitionType,
+                    format,
+                    startDateFrom,
+                    startDateTo,
+                    minEntryFee,
+                    maxEntryFee,
                   );
                 }}
                 className="w-full bg-transparent text-xs font-bold text-white outline-none"
@@ -590,93 +584,6 @@ function TournamentsPageContent() {
             </label>
 
             <label className="group flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-white/20">
-              <Trophy className="h-4 w-4 text-[#00ff66]" />
-              <select
-                value={competitionType}
-                disabled={!sport || sportsConfigLoading}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  const nextCompetition = selectedSportConfig?.competitions.find(
-                    (item) => item.type === value,
-                  );
-                  const nextFormat =
-                    nextCompetition?.supportedFormats?.[0] || '';
-
-                  setCompetitionType(value);
-                  setFormat(nextFormat);
-
-                  updateFilters(
-                    search,
-                    state,
-                    city,
-                    sport,
-                    status,
-                    value,
-                    nextFormat,
-                  );
-                }}
-                className="w-full bg-transparent text-xs font-bold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="" className="bg-[#080b0d]">
-                  {!sport
-                    ? 'SELECT SPORT FIRST'
-                    : sportsConfigLoading
-                      ? 'LOADING TYPES...'
-                      : 'ALL COMPETITION TYPES'}
-                </option>
-                {availableCompetitionTypes.map((item) => (
-                  <option
-                    key={item.type}
-                    value={item.type}
-                    className="bg-[#080b0d]"
-                  >
-                    {item.type.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="group flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-white/20">
-              <Trophy className="h-4 w-4 text-[#00ff66]" />
-              <select
-                value={format}
-                disabled={!competitionType || sportsConfigLoading}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setFormat(value);
-
-                  updateFilters(
-                    search,
-                    state,
-                    city,
-                    sport,
-                    status,
-                    competitionType,
-                    value,
-                  );
-                }}
-                className="w-full bg-transparent text-xs font-bold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="" className="bg-[#080b0d]">
-                  {!competitionType
-                    ? 'SELECT TYPE FIRST'
-                    : sportsConfigLoading
-                      ? 'LOADING FORMATS...'
-                      : 'ALL FORMATS'}
-                </option>
-                {availableFormats.map((item) => (
-                  <option
-                    key={item}
-                    value={item}
-                    className="bg-[#080b0d]"
-                  >
-                    {item.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="group flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-white/20">
               <MapPin className="h-4 w-4 text-[#00ff66]" />
               <select
                 value={state}
@@ -684,7 +591,19 @@ function TournamentsPageContent() {
                   const value = event.target.value;
                   setState(value);
                   setCity('');
-                  updateFilters(search, value, '', sport);
+                  updateFilters(
+                    search,
+                    value,
+                    '',
+                    sport,
+                    status,
+                    competitionType,
+                    format,
+                    startDateFrom,
+                    startDateTo,
+                    minEntryFee,
+                    maxEntryFee,
+                  );
                 }}
                 className="w-full bg-transparent text-xs font-bold text-white outline-none"
               >
@@ -711,7 +630,19 @@ function TournamentsPageContent() {
                 onChange={(event) => {
                   const value = event.target.value;
                   setCity(value);
-                  updateFilters(search, state, value, sport);
+                  updateFilters(
+                    search,
+                    state,
+                    value,
+                    sport,
+                    status,
+                    competitionType,
+                    format,
+                    startDateFrom,
+                    startDateTo,
+                    minEntryFee,
+                    maxEntryFee,
+                  );
                 }}
                 className="w-full bg-transparent text-xs font-bold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -734,69 +665,33 @@ function TournamentsPageContent() {
               </select>
             </label>
 
-            {/* Date Range: From */}
             <label className="group flex flex-1 items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3 transition hover:border-white/20">
               <Calendar className="h-4 w-4 text-[#00ff66]" />
               <input
                 type="date"
                 value={startDateFrom}
                 onChange={(event) => {
-                  const val = event.target.value;
-                  setStartDateFrom(val);
-                  updateFilters(search, state, city, sport, status, competitionType, format, val, startDateTo, minEntryFee, maxEntryFee);
+                  const value = event.target.value;
+                  setStartDateFrom(value);
+                  setStartDateTo(value);
+
+                  updateFilters(
+                    search,
+                    state,
+                    city,
+                    sport,
+                    status,
+                    competitionType,
+                    format,
+                    value,
+                    value,
+                    minEntryFee,
+                    maxEntryFee,
+                  );
                 }}
                 className="w-full bg-transparent text-xs font-bold text-white outline-none [color-scheme:dark]"
-                title="Start Date From"
-              />
-            </label>
-
-            {/* Date Range: To */}
-            <label className="group flex flex-1 items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3 transition hover:border-white/20">
-              <Calendar className="h-4 w-4 text-[#00ff66]" />
-              <input
-                type="date"
-                value={startDateTo}
-                onChange={(event) => {
-                  const val = event.target.value;
-                  setStartDateTo(val);
-                  updateFilters(search, state, city, sport, status, competitionType, format, startDateFrom, val, minEntryFee, maxEntryFee);
-                }}
-                className="w-full bg-transparent text-xs font-bold text-white outline-none [color-scheme:dark]"
-                title="Start Date To"
-              />
-            </label>
-
-            {/* Min Entry Fee */}
-            <label className="group flex flex-1 items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3 transition hover:border-white/20">
-              <IndianRupee className="h-4 w-4 text-[#00ff66]" />
-              <input
-                type="number"
-                min="0"
-                placeholder="MIN FEE"
-                value={minEntryFee}
-                onChange={(event) => {
-                  const val = event.target.value;
-                  setMinEntryFee(val);
-                  updateFilters(search, state, city, sport, status, competitionType, format, startDateFrom, startDateTo, val, maxEntryFee);
-                }}
-                className="w-full bg-transparent text-xs font-bold text-white outline-none placeholder:text-white/40"
-              />
-            </label>
-
-            {/* Max Entry Fee */}
-            <label className="group flex flex-1 items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3 transition hover:border-white/20">
-              <IndianRupee className="h-4 w-4 text-[#00ff66]" />
-              <input
-                type="number"
-                min="0"
-                placeholder="MAX FEE"
-                value={maxEntryFee}
-                onChange={(event) => {
-                  const val = event.target.value;
-                  setMaxEntryFee(val);
-                  updateFilters(search, state, city, sport, status, competitionType, format, startDateFrom, startDateTo, minEntryFee, val);
-                }}
-                className="w-full bg-transparent text-xs font-bold text-white outline-none placeholder:text-white/40"
+                title="Particular Date"
+                aria-label="Particular Date"
               />
             </label>
           </div>
@@ -813,88 +708,7 @@ function TournamentsPageContent() {
         </div>
       </section>
 
-      {/* Tournament status navigation */}
-      <section className="relative z-20 mx-auto max-w-6xl px-5 pt-8 sm:px-8 lg:px-12">
-        <div className="rounded-[26px] border border-white/10 bg-white/[0.025] p-2 backdrop-blur-xl">
-          <div className="flex flex-wrap gap-2">
-            {[
-              {
-                key: 'all',
-                label: 'ALL',
-                icon: '◈',
-                description: 'All tournaments',
-              },
-              {
-                key: 'pending',
-                label: 'AWAITING APPROVAL',
-                icon: '◐',
-                description: 'Waiting for approval',
-              },
-              {
-                key: 'upcoming',
-                label: 'UPCOMING',
-                icon: '◷',
-                description: 'Coming soon',
-              },
-              {
-                key: 'live',
-                label: 'LIVE NOW',
-                icon: '●',
-                description: 'Happening now',
-              },
-              {
-                key: 'completed',
-                label: 'COMPLETED',
-                icon: '✓',
-                description: 'Finished tournaments',
-              },
-            ].map((item) => {
-              const active = status === item.key;
-
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  title={item.description}
-                  onClick={() => {
-                    setStatus(item.key);
-                    updateFilters(search, state, city, sport, item.key);
-                  }}
-                  className={`group relative inline-flex items-center gap-2 rounded-[18px] border px-4 py-3 text-[10px] font-black tracking-[0.16em] transition-all duration-300 ${
-                    active
-                      ? 'border-[#00ff66]/40 bg-[#00ff66]/10 text-[#00ff66] shadow-[0_0_30px_rgba(0,255,102,0.08)]'
-                      : 'border-white/5 bg-white/[0.02] text-white/30 hover:border-white/15 hover:bg-white/[0.04] hover:text-white/65'
-                  }`}
-                >
-                  <span
-                    className={`text-xs ${
-                      active ? 'text-[#00ff66]' : 'text-white/45'
-                    }`}
-                  >
-                    {item.icon}
-                  </span>
-
-                  {item.key === 'live' && (
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        active
-                          ? 'animate-pulse bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.8)]'
-                          : 'bg-white/20'
-                      }`}
-                    />
-                  )}
-
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Discovery results */}
-      <section className="relative z-10">
-        <TournamentsGrid
+      <TournamentsGrid
           query={search}
           state={state}
           city={city}
@@ -907,7 +721,6 @@ function TournamentsPageContent() {
           minEntryFee={minEntryFee}
           maxEntryFee={maxEntryFee}
         />
-      </section>
     </main>
   );
 }

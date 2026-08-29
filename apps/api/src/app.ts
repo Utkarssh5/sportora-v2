@@ -9,6 +9,7 @@ import pinoHttpModule from "pino-http";
 import { swaggerUi, swaggerSpec } from "./docs/swagger.js";
 
 import { authRoutes } from "./modules/auth/routes/auth.routes.js";
+import { otpRoutes } from "./modules/auth/routes/otp.routes.js";
 import userRoutes from "./modules/users/routes/user.routes.js";
 import adminRoutes from "./modules/users/routes/admin.routes.js";
 
@@ -59,6 +60,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/auth/otp", otpRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/tournament-registration", tournamentRegistrationRoutes);

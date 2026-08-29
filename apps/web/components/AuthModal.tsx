@@ -11,6 +11,8 @@ import {
   ArrowRight,
   Smartphone,
   Zap,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -38,6 +40,7 @@ export default function AuthModal({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -96,7 +99,7 @@ export default function AuthModal({
                     organizationName,
                     governmentIdType,
                     governmentId,
-                    documentUrl,
+                    documentUrl: documentUrl.trim() || undefined,
                     address,
                     city,
                     state,
@@ -201,7 +204,7 @@ export default function AuthModal({
             opacity: 0,
             scale: 0.9,
           }}
-          className="relative w-full max-w-lg p-8 sm:p-10 text-left bg-gradient-to-b from-white/10 via-white/[0.03] to-transparent rounded-[40px] border-l-4 border-t border-[#00FF66] shadow-[0_0_50px_rgba(0,255,102,0.15)] overflow-hidden"
+          className="relative w-full max-w-lg max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)] p-8 sm:p-10 text-left bg-gradient-to-b from-white/10 via-white/[0.03] to-transparent rounded-[40px] border-l-4 border-t border-[#00FF66] shadow-[0_0_50px_rgba(0,255,102,0.15)] overflow-y-auto overflow-x-hidden"
         >
 
           <div className="absolute -top-1 -right-1 bg-[#00FF66] text-black font-black text-[10px] tracking-widest uppercase px-6 py-1.5 rounded-bl-2xl shadow-lg flex items-center gap-1">
@@ -347,7 +350,7 @@ export default function AuthModal({
 
                     <div>
                       <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                        FULL NAME
+                        FULL NAME <span className="text-red-500 font-black ml-0.5">*</span>
                       </label>
 
                       <div className="relative">
@@ -362,7 +365,7 @@ export default function AuthModal({
                           onChange={(e) =>
                             setFullName(e.target.value)
                           }
-                          placeholder="Utkarsh Tripathi"
+                          placeholder="Enter your full name"
                           disabled={loading}
                           className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
                         />
@@ -371,7 +374,7 @@ export default function AuthModal({
 
                     <div>
                       <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                        PHONE NUMBER
+                        PHONE NUMBER <span className="text-red-500 font-black ml-0.5">*</span>
                       </label>
 
                       <div className="relative">
@@ -385,7 +388,7 @@ export default function AuthModal({
                           onChange={(e) =>
                             setPhone(e.target.value)
                           }
-                          placeholder="9876543210"
+                          placeholder="91XXXXXXXXXX"
                           disabled={loading}
                           className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
                         />
@@ -412,27 +415,26 @@ export default function AuthModal({
                       </label>
                       <input
                         type="text"
-                        required
                         maxLength={150}
                         value={organizationName}
                         onChange={(e) => setOrganizationName(e.target.value)}
                         placeholder="Sportora Sports Academy"
                         disabled={loading}
-                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
+                        className="w-full bg-[#07130f] border border-white/10 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50 [color-scheme:dark]"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                          ID PROOF TYPE
+                          ID PROOF TYPE <span className="text-red-500 font-black ml-0.5">*</span>
                         </label>
                         <select
                           required
                           value={governmentIdType}
                           onChange={(e) => setGovernmentIdType(e.target.value)}
                           disabled={loading}
-                          className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
+                          className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50 [color-scheme:dark]"
                         >
                           <option value="">Select ID</option>
                           <option value="AADHAAR">Aadhaar</option>
@@ -445,7 +447,7 @@ export default function AuthModal({
 
                       <div>
                         <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                          ID NUMBER
+                          ID NUMBER <span className="text-red-500 font-black ml-0.5">*</span>
                         </label>
                         <input
                           type="text"
@@ -466,7 +468,6 @@ export default function AuthModal({
                       </label>
                       <input
                         type="url"
-                        required
                         value={documentUrl}
                         onChange={(e) => setDocumentUrl(e.target.value)}
                         placeholder="https://..."
@@ -483,7 +484,6 @@ export default function AuthModal({
                         COMPLETE ADDRESS
                       </label>
                       <textarea
-                        required
                         minLength={10}
                         maxLength={300}
                         value={address}
@@ -502,7 +502,6 @@ export default function AuthModal({
                         </label>
                         <input
                           type="text"
-                          required
                           maxLength={100}
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
@@ -518,7 +517,6 @@ export default function AuthModal({
                         </label>
                         <input
                           type="text"
-                          required
                           maxLength={100}
                           value={state}
                           onChange={(e) => setState(e.target.value)}
@@ -526,31 +524,13 @@ export default function AuthModal({
                           disabled={loading}
                           className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                          PINCODE
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          pattern="[0-9]{6}"
-                          maxLength={6}
-                          value={pincode}
-                          onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="302001"
-                          disabled={loading}
-                          className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
-                        />
-                      </div>
-                    </div>
+                      </div>                    </div>
                   </div>
                 )}
 
                 <div>
                   <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                    EMAIL ADDRESS
+                    EMAIL ADDRESS <span className="text-red-500 font-black ml-0.5">*</span>
                   </label>
 
                   <div className="relative">
@@ -572,14 +552,14 @@ export default function AuthModal({
 
                 <div>
                   <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-1">
-                    PASSCODE
+                    PASSCODE <span className="text-red-500 font-black ml-0.5">*</span>
                   </label>
 
                   <div className="relative">
                     <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-3.5" />
 
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       required
                       minLength={8}
                       maxLength={100}
@@ -589,8 +569,26 @@ export default function AuthModal({
                       }
                       placeholder="••••••••"
                       disabled={loading}
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl pl-10 pr-12 py-3 text-white text-xs outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
                     />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      disabled={loading}
+                      aria-label={
+                        showPassword
+                          ? 'Hide password'
+                          : 'Show password'
+                      }
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
                 </div>
 

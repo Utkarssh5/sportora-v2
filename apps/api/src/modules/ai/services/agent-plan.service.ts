@@ -70,7 +70,7 @@ export class AgentPlanService {
           this.step(
             "search-tournaments",
             "SEARCH_TOURNAMENTS",
-            "Find tournaments matching the player's requirements.",
+            "Find tournaments matching the player's requirements and available location/sport filters.",
             "search_tournaments"
           ),
         ];

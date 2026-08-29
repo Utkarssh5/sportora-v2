@@ -15,7 +15,7 @@ export interface IVenueVerification extends Document {
   venueAddress: string;
   city: string;
   state: string;
-  pincode: string;
+  pincode?: string;
 
   venuePhotos: string[];
   venueVideos: string[];
@@ -83,7 +83,7 @@ const VenueVerificationSchema = new Schema<IVenueVerification>(
 
     pincode: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
 

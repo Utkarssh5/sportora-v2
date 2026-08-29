@@ -716,6 +716,13 @@ export default function OrganizerDashboard() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    // Never allow an unapproved organizer to submit a tournament.
+    if (!canCreateTournament) {
+      setError('');
+      setSuccess('');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     setSuccess('');

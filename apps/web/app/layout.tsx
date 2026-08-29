@@ -1,5 +1,6 @@
 import './globals.css';
 import { ThemeProvider } from '../context/ThemeContext';
+import SportoraAI from '../components/SportoraAI';
 
 export const metadata = {
   title: 'Sportora V2 | Arena Engine',
@@ -16,6 +17,7 @@ export default function RootLayout({
       <body className="antialiased selection:bg-[#00FF66] selection:text-black">
         <ThemeProvider>
           {children}
+          <SportoraAI />
         </ThemeProvider>
       </body>
     </html>

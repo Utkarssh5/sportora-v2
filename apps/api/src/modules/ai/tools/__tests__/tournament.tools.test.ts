@@ -167,4 +167,115 @@ describe("AI tournament discovery safety", () => {
 
     expect(limit).toBe(20);
   });
+
+  it("applies an explicit tournament start-date range", async () => {
+    await tournamentTools.searchTournaments(
+      {
+        startDateFrom: "2026-08-25T00:00:00.000Z",
+        startDateTo: "2026-08-30T23:59:59.999Z",
+      },
+      context()
+    );
+
+    const call =
+      mocks.getTournaments.mock.calls[0];
+
+    expect(call).toBeDefined();
+
+    const [filter] = call!;
+
+    expect(filter.startDate).toEqual({
+      $gte: new Date("2026-08-25T00:00:00.000Z"),
+      $lte: new Date("2026-08-30T23:59:59.999Z"),
+    });
+  });
+
+  it("combines date range with city and sport filters", async () => {
+    await tournamentTools.searchTournaments(
+      {
+        city: "Jaipur",
+        sport: "Football",
+        startDateFrom: "2026-08-25T00:00:00.000Z",
+        startDateTo: "2026-08-30T23:59:59.999Z",
+      },
+      context()
+    );
+
+    const call =
+      mocks.getTournaments.mock.calls[0];
+
+    expect(call).toBeDefined();
+
+    const [filter] = call!;
+
+    expect(filter.status).toBe("APPROVED");
+
+    expect(filter.city).toEqual(expect.any(RegExp));
+    expect(filter.sport).toEqual(expect.any(RegExp));
+
+    expect(filter.startDate).toEqual({
+      $gte: new Date("2026-08-25T00:00:00.000Z"),
+      $lte: new Date("2026-08-30T23:59:59.999Z"),
+    });
+  });
+
+  it("supports only a lower date boundary", async () => {
+    await tournamentTools.searchTournaments(
+      {
+        startDateFrom: "2026-09-01T00:00:00.000Z",
+      },
+      context()
+    );
+
+    const call =
+      mocks.getTournaments.mock.calls[0];
+
+    expect(call).toBeDefined();
+
+    const [filter] = call!;
+
+    expect(filter.startDate).toEqual({
+      $gte: new Date("2026-09-01T00:00:00.000Z"),
+    });
+  });
+
+  it("supports only an upper date boundary", async () => {
+    await tournamentTools.searchTournaments(
+      {
+        startDateTo: "2026-09-30T23:59:59.999Z",
+      },
+      context()
+    );
+
+    const call =
+      mocks.getTournaments.mock.calls[0];
+
+    expect(call).toBeDefined();
+
+    const [filter] = call!;
+
+    expect(filter.startDate).toEqual({
+      $lte: new Date("2026-09-30T23:59:59.999Z"),
+    });
+  });
+
+  it("ignores an invalid date boundary instead of creating an invalid Mongo date", async () => {
+    await tournamentTools.searchTournaments(
+      {
+        startDateFrom: "not-a-date",
+        startDateTo: "also-not-a-date",
+      },
+      context()
+    );
+
+    const call =
+      mocks.getTournaments.mock.calls[0];
+
+    expect(call).toBeDefined();
+
+    const [filter] = call!;
+
+    expect(filter.startDate).toBeUndefined();
+  });
+
 });

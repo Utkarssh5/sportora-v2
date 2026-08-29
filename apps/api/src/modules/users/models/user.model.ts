@@ -26,6 +26,7 @@ export interface IUser extends Document {
   bio?: string;
   city?: string;
   state?: string;
+  primarySport?: string;
   interests?: string[];
   achievements?: string[];
 
@@ -97,6 +98,13 @@ const UserSchema = new Schema<IUser>(
       default: "",
       trim: true,
       maxlength: 100,
+    },
+
+    primarySport: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 50,
     },
 
     interests: {

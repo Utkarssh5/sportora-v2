@@ -873,8 +873,7 @@ const [supportStatusFilter, setSupportStatusFilter] =
                       )}
                     </div>
 
-                    {organizerDetailsId === item._id && (
-                      <div className="flex shrink-0 flex-col gap-2 lg:w-44">
+                    <div className="flex shrink-0 flex-col gap-2 lg:w-44">
                         <button
                           disabled={Boolean(action)}
                           onClick={() =>
@@ -906,7 +905,6 @@ const [supportStatusFilter, setSupportStatusFilter] =
                           ✕ Reject
                         </button>
                       </div>
-                    )}
                   </div>
                 </article>
               ))}

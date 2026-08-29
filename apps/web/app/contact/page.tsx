@@ -38,7 +38,7 @@ const supportOptions = [
 
 export default function ContactPage() {
   return (
-    <main className="min-h-screen bg-[#050816] px-6 py-20 text-white">
+    <main className="contact-page min-h-screen bg-[#050816] px-6 py-20 text-white">
       <div className="mx-auto max-w-5xl">
         <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#22d3ee]">
           Contact & Support

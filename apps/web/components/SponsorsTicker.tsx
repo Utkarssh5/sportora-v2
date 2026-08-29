@@ -17,7 +17,7 @@ const ITEMS = [...SPONSORS, ...SPONSORS, ...SPONSORS];
 
 export default function SponsorsTicker() {
   return (
-    <section className="relative overflow-hidden border-y border-white/10 bg-black/70 py-10 backdrop-blur-xl">
+    <section className="relative overflow-hidden border-y border-white/10 bg-black/70 py-5 backdrop-blur-xl">
       {/* Ambient grid */}
       <div
         aria-hidden="true"

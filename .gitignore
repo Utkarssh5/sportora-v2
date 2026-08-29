@@ -36,3 +36,12 @@ Thumbs.db
 
 # Misc
 *.tmp
+# Backup / temporary files
+*.backup
+*.backup-*
+*.before-*
+*.tsbuildinfo
+
+# Local debug / setup scripts
+apps/api/find-qa-tournament.ts
+apps/api/scripts/create-eren-verification.ts

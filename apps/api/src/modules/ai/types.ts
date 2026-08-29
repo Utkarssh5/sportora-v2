@@ -108,10 +108,24 @@ export interface AgentGoal {
   updatedAt?: Date;
 }
 
+export interface AgentTournamentSearchContext {
+  search?: string;
+  sport?: string;
+  city?: string;
+  state?: string;
+  nearby?: boolean;
+  status?: string;
+  minEntryFee?: number;
+  maxEntryFee?: number;
+  startDateFrom?: string;
+  startDateTo?: string;
+}
+
 export interface AgentState {
   activeIntent: AgentIntent;
   activeEntity?: AgentEntity;
   candidateTournaments: AgentCandidateTournament[];
+  lastTournamentSearch?: AgentTournamentSearchContext;
   goal?: AgentGoal;
   lastTool?: string;
   lastUserMessage?: string;

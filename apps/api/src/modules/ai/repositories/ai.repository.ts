@@ -1,5 +1,6 @@
 import { AIConversationModel } from "../models/ai-conversation.model.js";
 import { AIMessageModel } from "../models/ai-message.model.js";
+import type { AgentState } from "../types.js";
 
 
 export const aiRepository = {
@@ -29,14 +30,14 @@ export const aiRepository = {
 
   async getAgentState(
     conversationId: string
-  ) {
+  ): Promise<AgentState | null> {
     const conversation =
       await AIConversationModel.findOne(
         { conversationId },
         { agentState: 1 }
       ).lean();
 
-    return conversation?.agentState ?? null;
+    return (conversation?.agentState as AgentState | undefined) ?? null;
   },
 
 
@@ -56,6 +57,18 @@ export const aiRepository = {
         city?: string;
         entryFee?: number;
       }>;
+      lastTournamentSearch?: {
+        search?: string;
+        sport?: string;
+        city?: string;
+        state?: string;
+        nearby?: boolean;
+        status?: string;
+        minEntryFee?: number;
+        maxEntryFee?: number;
+        startDateFrom?: string;
+        startDateTo?: string;
+      };
       goal?: {
         type?: string;
         status?: string;
@@ -101,6 +114,13 @@ export const aiRepository = {
             ? {
                 "agentState.candidateTournaments":
                   state.candidateTournaments,
+              }
+            : {}),
+
+          ...(state.lastTournamentSearch !== undefined
+            ? {
+                "agentState.lastTournamentSearch":
+                  state.lastTournamentSearch,
               }
             : {}),
 

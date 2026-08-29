@@ -10,6 +10,7 @@ type WorkflowPlanStep = {
 type WorkflowState = {
   goal?: {
     status: AgentWorkflowStage;
+    pendingAction?: string | null;
     lastObservation?: string | null;
     plan?: {
       steps: WorkflowPlanStep[];
@@ -61,6 +62,24 @@ export class AgentWorkflowService {
 
     const status: AgentWorkflowStage =
       goal.status;
+
+    /*
+     * Explicit registration confirmation is a deterministic
+     * workflow transition. The registration state uses
+     * pendingAction=CONFIRM_PAYMENT rather than a separate
+     * WAITING_CONFIRMATION workflow stage.
+     */
+    if (
+      goal.pendingAction === "CONFIRM_PAYMENT"
+    ) {
+      return {
+        decision: "CONTINUE",
+        reason:
+          "Explicit player confirmation is required and confirm_pending_registration is the only permitted next tool.",
+        allowedNextTool:
+          "confirm_pending_registration",
+      };
+    }
 
     const plan = goal.plan;
 
@@ -117,13 +136,6 @@ export class AgentWorkflowService {
     }
 
     switch (status) {
-      case "WAITING_CONFIRMATION":
-        return {
-          decision: "ASK_USER",
-          reason:
-            "Explicit player confirmation is required before payment can proceed.",
-        };
-
       case "PAYMENT_READY":
         return {
           decision: "CONTINUE",

@@ -9,21 +9,82 @@ export const tournamentTools = {
       sport?: string;
       city?: string;
       state?: string;
+      nearby?: boolean;
       status?: string;
       minEntryFee?: number;
       maxEntryFee?: number;
+      startDateFrom?: string;
+      startDateTo?: string;
       page?: number;
       limit?: number;
     },
     _context: AgentContext
   ): Promise<AgentToolResult> {
     try {
+      console.log(
+        "[AI] search_tournaments args:",
+        JSON.stringify(args, null, 2)
+      );
+
+      const now = new Date();
+
       const filter: Record<string, unknown> = {
         status: "APPROVED",
-        registrationDeadline: {
-          $gt: new Date(),
-        },
       };
+
+      /*
+       * Tournament status is derived from start/end dates.
+       *
+       * ONGOING:
+       *   startDate <= now <= endDate
+       *
+       * UPCOMING:
+       *   startDate > now
+       *
+       * COMPLETED:
+       *   endDate < now
+       *
+       * Keep registrationDeadline separate because an ongoing
+       * tournament may already have closed registration.
+       */
+      const requestedStatus =
+        typeof args.status === "string"
+          ? args.status.trim().toUpperCase()
+          : "";
+
+      if (
+        requestedStatus === "ONGOING" ||
+        requestedStatus === "LIVE" ||
+        requestedStatus === "CURRENT"
+      ) {
+        filter.startDate = { $lte: now };
+        filter.endDate = { $gte: now };
+      } else if (
+        requestedStatus === "UPCOMING" ||
+        requestedStatus === "FUTURE"
+      ) {
+        filter.startDate = { $gt: now };
+        filter.registrationDeadline = {
+          $gt: now,
+        };
+      } else if (
+        requestedStatus === "COMPLETED" ||
+        requestedStatus === "PAST"
+      ) {
+        filter.endDate = { $lt: now };
+        filter.registrationDeadline = {
+          $gt: now,
+        };
+      } else {
+        /*
+         * Default and unknown-status discovery must preserve the
+         * existing safety rule: only approved tournaments with
+         * an open registration deadline are discoverable.
+         */
+        filter.registrationDeadline = {
+          $gt: now,
+        };
+      }
 
       if (args.search) {
         const searchRegex = new RegExp(
@@ -44,8 +105,8 @@ export const tournamentTools = {
         filter.sport = new RegExp(`^${escapeRegex(args.sport)}$`, "i");
       }
 
-      if (args.city) {
-        filter.city = new RegExp(`^${escapeRegex(args.city)}$`, "i");
+      if (args.city && !args.nearby) {
+        filter.city = new RegExp(escapeRegex(args.city), "i");
       }
 
       if (args.state) {
@@ -64,6 +125,36 @@ export const tournamentTools = {
         }
 
         filter.entryFee = entryFee;
+      }
+
+      /*
+       * Optional explicit tournament start-date range.
+       *
+       * These filters are combined with the existing status,
+       * sport, city, state and entry-fee filters.
+       */
+      if (args.startDateFrom || args.startDateTo) {
+        const startDate: Record<string, Date> = {};
+
+        if (args.startDateFrom) {
+          const from = new Date(args.startDateFrom);
+
+          if (!Number.isNaN(from.getTime())) {
+            startDate.$gte = from;
+          }
+        }
+
+        if (args.startDateTo) {
+          const to = new Date(args.startDateTo);
+
+          if (!Number.isNaN(to.getTime())) {
+            startDate.$lte = to;
+          }
+        }
+
+        if (Object.keys(startDate).length > 0) {
+          filter.startDate = startDate;
+        }
       }
 
       const result = await tournamentService.getTournaments(

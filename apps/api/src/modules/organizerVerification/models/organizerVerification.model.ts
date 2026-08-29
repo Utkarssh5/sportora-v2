@@ -13,12 +13,12 @@ export interface IOrganizerVerification extends Document {
 
   governmentIdType: string;
   governmentId: string;
-  documentUrl: string;
+  documentUrl?: string;
 
   address: string;
   city: string;
   state: string;
-  pincode: string;
+  pincode?: string;
 
   status: VerificationStatus;
   remarks?: string;
@@ -59,7 +59,7 @@ const OrganizerVerificationSchema =
 
       documentUrl: {
         type: String,
-        required: true,
+        required: false,
       },
 
       address: {
@@ -82,7 +82,7 @@ const OrganizerVerificationSchema =
 
       pincode: {
         type: String,
-        required: true,
+        required: false,
         trim: true,
       },
 

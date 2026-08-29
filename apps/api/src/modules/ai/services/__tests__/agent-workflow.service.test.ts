@@ -49,16 +49,26 @@ function plannedState(
 }
 
 describe("AgentWorkflowService", () => {
-  it("asks for confirmation when registration confirmation is required", () => {
+  it("allows confirmation when registration confirmation is required", () => {
+    const currentState: AgentState = {
+      ...state("REGISTRATION"),
+      goal: {
+        ...state("REGISTRATION").goal!,
+        pendingAction: "CONFIRM_PAYMENT",
+      },
+    };
+
     const result =
       AgentWorkflowService.evaluate(
-        state("WAITING_CONFIRMATION")
+        currentState
       );
 
     expect(result).toEqual({
-      decision: "ASK_USER",
+      decision: "CONTINUE",
       reason:
-        "Explicit player confirmation is required before payment can proceed.",
+        "Explicit player confirmation is required and confirm_pending_registration is the only permitted next tool.",
+      allowedNextTool:
+        "confirm_pending_registration",
     });
   });
 

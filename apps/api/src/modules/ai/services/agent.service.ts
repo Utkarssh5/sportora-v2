@@ -17,6 +17,7 @@ import { referenceResolverService } from "./reference-resolver.service.js";
 import { agentPlannerService } from "./agent-planner.service.js";
 import { agentVerificationService } from "./agent-verification.service.js";
 import { agentPlanExecutorService } from "./agent-plan-executor.service.js";
+import { DateResolverService } from "./date-resolver.service.js";
 
 import type {
   AgentContext,
@@ -34,6 +35,64 @@ type AgentContent = {
   role: "user" | "model";
   parts: any[];
 };
+
+function buildDateRuntimeContext(
+  prompt: string,
+  referenceDate = new Date()
+): string {
+  const normalized = prompt
+    .trim()
+    .toLowerCase();
+
+  const expressions = [
+    "this weekend",
+    "next weekend",
+    "this week",
+    "next week",
+    "this month",
+    "next month",
+    "tomorrow",
+    "yesterday",
+    "today",
+    "aaj",
+    "kal",
+  ];
+
+  const expression =
+    expressions.find((candidate) =>
+      normalized.includes(candidate)
+    );
+
+  if (!expression) {
+    return "";
+  }
+
+  const resolved =
+    DateResolverService.resolve(
+      expression,
+      referenceDate
+    );
+
+  if (resolved.needsClarification) {
+    return [
+      "DETERMINISTIC DATE CONTEXT",
+      `Requested date expression: ${expression}`,
+      "Date could not be safely resolved.",
+      `Clarification: ${resolved.clarificationMessage ?? ""}`,
+    ].join("\n");
+  }
+
+  return [
+    "DETERMINISTIC DATE CONTEXT",
+    "Sportora's deterministic date resolver produced the following authoritative range.",
+    `Requested expression: ${expression}`,
+    `startDateFrom: ${resolved.startDateFrom ?? ""}`,
+    `startDateTo: ${resolved.startDateTo ?? ""}`,
+    "Use these exact values for tournament discovery.",
+    "Do not recalculate, reinterpret, broaden, or replace this date range.",
+  ].join("\n");
+}
+
 
 function buildRuntimeContext(
   agentState: unknown,
@@ -203,6 +262,8 @@ export class AgentService {
       );
 
 
+    let lastToolData: unknown = undefined;
+
     const contents: AgentContent[] =
       previousMessages.map(
         (message) => ({
@@ -287,10 +348,17 @@ export class AgentService {
           currentPendingRegistration
         );
 
+      const dateRuntimeContext =
+        buildDateRuntimeContext(prompt);
+
       const effectiveSystemPrompt =
-        runtimeContext
-          ? `${systemPrompt}\n\n${runtimeContext}`
-          : systemPrompt;
+        [
+          systemPrompt,
+          runtimeContext,
+          dateRuntimeContext,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
 
         /*
          * Create a dynamic execution plan when:
@@ -318,9 +386,19 @@ export class AgentService {
               typeof currentAgentState.goal
             >;
 
+          const plannerGoal = {
+            ...goalForPlanner,
+            ...(currentAgentState?.lastTournamentSearch
+              ? {
+                  lastTournamentSearch:
+                    currentAgentState.lastTournamentSearch,
+                }
+              : {}),
+          };
+
           const dynamicPlan =
             await agentPlannerService.createDynamicPlan(
-              goalForPlanner as any,
+              plannerGoal as any,
               context
             );
 
@@ -439,6 +517,7 @@ export class AgentService {
           success: true,
           message: finalMessage,
           conversationId,
+          data: lastToolData,
         };
       }
 
@@ -584,7 +663,41 @@ export class AgentService {
               )
             );
 
+          /*
+           * A search plan may contain a reasoning/checkpoint step
+           * after SEARCH_TOURNAMENTS. A new user message can
+           * legitimately turn the discovered candidates into
+           * an explicit action, e.g. "register in the second one".
+           *
+           * Do not let the stale discovery checkpoint block that
+           * conversational follow-up. Registration still passes
+           * through the normal registration/confirmation/payment
+           * workflow gates below.
+           */
+          const isTournamentRegistrationFollowUp =
+            toolName === "register_for_tournament" &&
+            currentAgentState?.activeIntent ===
+              "TOURNAMENT_DISCOVERY" &&
+            Array.isArray(
+              currentAgentState?.candidateTournaments
+            ) &&
+            currentAgentState.candidateTournaments.length > 0;
+
+          /*
+           * Once registration is waiting for explicit payment
+           * confirmation, the user's confirmation must be able
+           * to execute confirm_pending_registration even if an
+           * older dynamic-plan checkpoint is still persisted.
+           */
+          const isRegistrationConfirmationFollowUp =
+            toolName ===
+              "confirm_pending_registration" &&
+            currentAgentState?.goal?.status ===
+              "WAITING_CONFIRMATION";
+
           if (
+            !isTournamentRegistrationFollowUp &&
+            !isRegistrationConfirmationFollowUp &&
             executableStep &&
             executableStep.toolName !== toolName
           ) {
@@ -597,6 +710,8 @@ export class AgentService {
            * the agent must observe/reason before another tool.
            */
           if (
+            !isTournamentRegistrationFollowUp &&
+            !isRegistrationConfirmationFollowUp &&
             !executableStep &&
             normalizedPlan.steps.some(
               (step) =>
@@ -617,11 +732,46 @@ export class AgentService {
          * persisted-plan gate and workflow gate share the
          * same evaluation for this tool request.
          */
-        const workflowAllowsTool =
+        /*
+         * The workflow gate is authoritative for sensitive
+         * transactional stages such as confirmation/payment.
+         *
+         * Informational requests such as tournament discovery,
+         * tournament details, profile and match queries must not
+         * be blocked by a stale checkpoint from an older workflow.
+         */
+        const activeGoalType =
+          currentAgentState?.goal?.type;
+
+        const activeGoalStatus =
+          currentAgentState?.goal?.status;
+
+        const transactionalStage =
+          activeGoalType === "REGISTER_TOURNAMENT" ||
+          activeGoalType === "PAYMENT" ||
+          activeGoalStatus === "WAITING_CONFIRMATION" ||
+          activeGoalStatus === "PAYMENT_READY" ||
+          activeGoalStatus === "PAYMENT_PENDING" ||
+          currentAgentState?.activeIntent === "PAYMENT" ||
+          currentAgentState?.activeIntent === "TOURNAMENT_REGISTRATION" ||
+          String(currentAgentState?.activeIntent) === "PAYMENT_READY";
+
+        /*
+         * Always evaluate the workflow gate so the evaluator remains
+         * observable and authoritative. For normal informational
+         * requests, an old/stale transactional workflow must not
+         * prevent the appropriate read-only tool from executing.
+         */
+        const evaluatorAllowsTool =
           agentWorkflowService.isToolAllowed(
             currentWorkflowEvaluation,
             toolName
           );
+
+        const workflowAllowsTool =
+          transactionalStage
+            ? evaluatorAllowsTool
+            : true;
 
         if (!workflowAllowsTool) {
           const allowedTool =
@@ -665,6 +815,7 @@ export class AgentService {
 
 
         let result: AgentToolResult;
+        let toolArgs = functionCall.args ?? {};
 
 
         if (!handler) {
@@ -678,9 +829,6 @@ export class AgentService {
         } else {
 
           try {
-
-            let toolArgs =
-              functionCall.args ?? {};
 
             /*
              * Resolve conversational tournament references
@@ -733,7 +881,8 @@ export class AgentService {
                 await agentStateService.recordToolResult(
                   toolName,
                   result,
-                  context
+                  context,
+                  toolArgs
                 );
 
                 functionResponseParts.push({
@@ -754,7 +903,8 @@ export class AgentService {
                 await agentStateService.recordToolResult(
                   toolName,
                   result,
-                  context
+                  context,
+                  toolArgs
                 );
 
                 functionResponseParts.push({
@@ -789,8 +939,18 @@ export class AgentService {
         await agentStateService.recordToolResult(
           toolName,
           result,
-          context
+          context,
+          toolArgs
         );
+
+        /*
+         * Preserve structured data from the latest successful
+         * tool so the API can expose it alongside Gemini's
+         * natural-language response.
+         */
+        if (result.success && result.data !== undefined) {
+          lastToolData = result.data;
+        }
 
         /*
          * Evaluate the workflow after every tool observation.
@@ -953,6 +1113,7 @@ export class AgentService {
             success: true,
             message: workflowMessage,
             conversationId,
+            data: result.success ? result.data : undefined,
           };
         }
 

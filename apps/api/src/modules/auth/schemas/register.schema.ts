@@ -76,14 +76,6 @@ export const registerSchema = baseRegisterSchema.superRefine(
       });
     }
 
-    if (!data.documentUrl) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["documentUrl"],
-        message: "Government ID document is required",
-      });
-    }
-
     if (!data.address) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -108,19 +100,6 @@ export const registerSchema = baseRegisterSchema.superRefine(
       });
     }
 
-    if (!data.pincode) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["pincode"],
-        message: "Pincode is required",
-      });
-    } else if (!/^[0-9]{6}$/.test(data.pincode)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["pincode"],
-        message: "Pincode must be 6 digits",
-      });
-    }
   }
 );
 

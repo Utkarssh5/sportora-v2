@@ -27,11 +27,45 @@ export const agentToolDeclarations = [
         },
         city: {
           type: Type.STRING,
-          description: "Optional city.",
+          description:
+            "Optional city. Use the user's requested city for the initial search.",
+        },
+        state: {
+          type: Type.STRING,
+          description:
+            "Optional state/region. Preserve this when broadening a search to nearby locations.",
+        },
+        nearby: {
+          type: Type.BOOLEAN,
+          description:
+            "Set true only when the user asks for nearby, surrounding, alternative, or broader-location tournaments after the requested location has no suitable results. When true, do not require an exact city match; preserve the requested sport and state when available.",
         },
         sport: {
           type: Type.STRING,
           description: "Optional sport.",
+        },
+        status: {
+          type: Type.STRING,
+          description:
+            "Optional tournament status: ONGOING, UPCOMING, or COMPLETED.",
+        },
+        startDateFrom: {
+          type: Type.STRING,
+          description:
+            "Optional inclusive tournament start date/time lower bound in ISO-8601 format.",
+        },
+        startDateTo: {
+          type: Type.STRING,
+          description:
+            "Optional inclusive tournament start date/time upper bound in ISO-8601 format.",
+        },
+        minEntryFee: {
+          type: Type.NUMBER,
+          description: "Optional minimum entry fee.",
+        },
+        maxEntryFee: {
+          type: Type.NUMBER,
+          description: "Optional maximum entry fee.",
         },
       },
     },

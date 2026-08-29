@@ -29,7 +29,8 @@ export class AgentStateService {
   public static async recordToolResult(
     toolName: string,
     result: AgentToolResult,
-    context: AgentContext
+    context: AgentContext,
+    toolArgs?: Record<string, unknown>
   ) {
     if (!context.conversationId) {
       return;
@@ -43,7 +44,9 @@ export class AgentStateService {
     const state = result.success
       ? this.deriveState(
           toolName,
-          result
+          result,
+          previousState,
+          toolArgs
         )
       : this.deriveFailureState(
           toolName,
@@ -74,6 +77,42 @@ export class AgentStateService {
                     ? {
                         dependsOn:
                           [...step.dependsOn],
+                      }
+                    : {}),
+                  ...((step as unknown as import('../types.js').AgentPlanStep).requiredInformation
+                    ? {
+                        requiredInformation:
+                          [...((step as unknown as import('../types.js').AgentPlanStep).requiredInformation ?? [])],
+                      }
+                    : {}),
+                  ...((step as unknown as import('../types.js').AgentPlanStep).constraints
+                    ? {
+                        constraints:
+                          { ...(step as unknown as import('../types.js').AgentPlanStep).constraints },
+                      }
+                    : {}),
+                  ...((step as unknown as import('../types.js').AgentPlanStep).successCriteria
+                    ? {
+                        successCriteria:
+                          [...((step as unknown as import('../types.js').AgentPlanStep).successCriteria ?? [])],
+                      }
+                    : {}),
+                  ...((step as unknown as import('../types.js').AgentPlanStep).verificationCriteria
+                    ? {
+                        verificationCriteria:
+                          [...((step as unknown as import('../types.js').AgentPlanStep).verificationCriteria ?? [])],
+                      }
+                    : {}),
+                  ...((step as unknown as import('../types.js').AgentPlanStep).failureStrategy != null
+                    ? {
+                        failureStrategy:
+                          (step as unknown as import('../types.js').AgentPlanStep).failureStrategy,
+                      }
+                    : {}),
+                  ...((step as unknown as import('../types.js').AgentPlanStep).requiresUserInput != null
+                    ? {
+                        requiresUserInput:
+                          (step as unknown as import('../types.js').AgentPlanStep).requiresUserInput,
                       }
                     : {}),
                   ...(step.observation != null
@@ -119,13 +158,13 @@ export class AgentStateService {
     if (state.goal && updatedPlan) {
       state.goal = {
         ...state.goal,
-        plan: updatedPlan,
-      };
+        plan: updatedPlan as any,
+      } as any;
     }
 
     await aiRepository.updateAgentState(
       context.conversationId,
-      state
+      state as any
     );
   }
 
@@ -182,6 +221,18 @@ export class AgentStateService {
                   : {}),
               }
             : null,
+
+        ...(previousState?.lastTournamentSearch
+          ? {
+              lastTournamentSearch:
+                JSON.parse(
+                  JSON.stringify(
+                    previousState.lastTournamentSearch
+                  )
+                ),
+            }
+          : {}),
+
         candidateTournaments:
           previousState?.candidateTournaments
             ? JSON.parse(
@@ -223,9 +274,63 @@ export class AgentStateService {
     };
   }
 
+  private static normalizeTournamentSearchContext(
+    args?: Record<string, unknown>
+  ) {
+    if (!args) {
+      return undefined;
+    }
+
+    const result: Record<string, unknown> = {};
+
+    const stringFields = [
+      "search",
+      "sport",
+      "city",
+      "state",
+      "status",
+      "startDateFrom",
+      "startDateTo",
+    ];
+
+    for (const field of stringFields) {
+      const value = args[field];
+
+      if (typeof value === "string" && value.trim()) {
+        result[field] = value.trim();
+      }
+    }
+
+    if (typeof args.nearby === "boolean") {
+      result.nearby = args.nearby;
+    }
+
+    const numberFields = [
+      "minEntryFee",
+      "maxEntryFee",
+    ];
+
+    for (const field of numberFields) {
+      const value = args[field];
+
+      if (
+        typeof value === "number" &&
+        Number.isFinite(value)
+      ) {
+        result[field] = value;
+      }
+    }
+
+    return result;
+  }
+
   private static deriveState(
     toolName: string,
-    result: AgentToolResult
+    result: AgentToolResult,
+    previousState: Awaited<
+      ReturnType<typeof aiRepository.getAgentState>
+    >,
+    toolArgs?: Record<string, unknown>
   ) {
     switch (toolName) {
 
@@ -233,6 +338,10 @@ export class AgentStateService {
         return {
           activeIntent:
             "TOURNAMENT_DISCOVERY" as AgentIntent,
+
+          lastTournamentSearch:
+            this.normalizeTournamentSearchContext(toolArgs),
+
           candidateTournaments:
             this.extractTournamentCandidates(result),
           goal:
@@ -446,7 +555,133 @@ export class AgentStateService {
           lastTool: toolName,
         };
 
-      case "get_my_profile":
+      case "get_my_profile": {
+        /*
+         * Profile lookup can be an intermediate observation for another
+         * workflow, especially:
+         *
+         *   GET_PROFILE -> SEARCH_TOURNAMENTS
+         *
+         * Preserve the actual profile data in the observation so the
+         * next planner iteration can safely resolve requests such as:
+         *
+         *   "near me"
+         *   "in my city"
+         *   "in my area"
+         *
+         * without asking the user for information we already have.
+         */
+        const profileData =
+          result.data &&
+          typeof result.data === "object"
+            ? result.data as Record<string, unknown>
+            : null;
+
+        const profileObservation = [
+          result.message ??
+            "Profile retrieved successfully.",
+          profileData?.city
+            ? `Player city: ${String(profileData.city)}.`
+            : "Player city is not available.",
+          profileData?.state
+            ? `Player state: ${String(profileData.state)}.`
+            : "Player state is not available.",
+        ].join(" ");
+
+        /*
+         * IMPORTANT:
+         * GET_PROFILE can be an intermediate step of tournament discovery.
+         *
+         * Example:
+         *   "show football tournaments near me"
+         *        -> GET_PROFILE
+         *        -> SEARCH_TOURNAMENTS
+         *
+         * Do NOT replace DISCOVER_TOURNAMENT with VIEW_PROFILE here.
+         * Preserve the original discovery goal and attach the real
+         * player location as runtime constraints for the next planner
+         * iteration.
+         */
+        const previousGoal =
+          previousState?.goal;
+
+        if (
+          previousGoal?.type ===
+          "DISCOVER_TOURNAMENT"
+        ) {
+          const existingConstraints =
+            previousGoal.constraints ?? {};
+
+          const discoveryConstraints = {
+            ...existingConstraints,
+            ...(profileData?.city
+              ? {
+                  playerCity:
+                    String(profileData.city),
+                }
+              : {}),
+            ...(profileData?.state
+              ? {
+                  playerState:
+                    String(profileData.state),
+                }
+              : {}),
+          };
+
+          return {
+            activeIntent:
+              "TOURNAMENT_DISCOVERY" as AgentIntent,
+            activeEntity:
+              previousState?.activeEntity?.id &&
+              previousState?.activeEntity?.type
+                ? {
+                    id:
+                      String(
+                        previousState.activeEntity.id
+                      ),
+                    type:
+                      previousState.activeEntity.type,
+                    ...(previousState.activeEntity.label != null
+                      ? {
+                          label:
+                            String(
+                              previousState.activeEntity.label
+                            ),
+                        }
+                      : {}),
+                  }
+                : null,
+            candidateTournaments:
+              previousState?.candidateTournaments
+                ? JSON.parse(
+                    JSON.stringify(
+                      previousState.candidateTournaments
+                    )
+                  )
+                : [],
+            goal: {
+              ...previousGoal,
+              type:
+                previousGoal.type ??
+                "DISCOVER_TOURNAMENT",
+              status:
+                "IN_PROGRESS" as const,
+              constraints:
+                discoveryConstraints,
+              completedSteps: [
+                ...(previousGoal.completedSteps ?? []),
+                "GET_PROFILE",
+              ],
+              lastObservation:
+                profileObservation,
+              pendingAction:
+                "SEARCH_TOURNAMENTS",
+              updatedAt: new Date(),
+            },
+            lastTool: toolName,
+          };
+        }
+
         return {
           activeIntent:
             "PROFILE" as AgentIntent,
@@ -460,12 +695,26 @@ export class AgentStateService {
                   "GET_PROFILE",
                 ],
                 lastObservation:
-                  result.message ??
-                  "Profile retrieved.",
+                  profileObservation,
+                ...(profileData?.city
+                  ? {
+                      constraints: {
+                        playerCity:
+                          String(profileData.city),
+                        ...(profileData?.state
+                          ? {
+                              playerState:
+                                String(profileData.state),
+                            }
+                          : {}),
+                      },
+                    }
+                  : {}),
               }
             ),
           lastTool: toolName,
         };
+      }
 
       case "get_match_details":
       case "get_tournament_matches":

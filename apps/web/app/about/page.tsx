@@ -66,7 +66,7 @@ export default function AboutPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#030507] text-white">
+    <main className="about-page min-h-screen overflow-hidden bg-[#030507] text-white">
       {/* AMBIENT FIELD */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,255,102,0.08),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(34,211,238,0.07),transparent_25%),radial-gradient(circle_at_50%_90%,rgba(167,139,250,0.07),transparent_28%)]" />

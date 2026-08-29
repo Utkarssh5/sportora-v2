@@ -63,7 +63,7 @@ export default function VisionPage() {
   const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#02030a] text-white">
+    <main className="vision-page min-h-screen overflow-hidden bg-[#02030a] text-white">
       {/* FUTURE FIELD */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(34,211,238,0.11),transparent_26%),radial-gradient(circle_at_85%_20%,rgba(139,92,246,0.12),transparent_28%),radial-gradient(circle_at_50%_80%,rgba(0,255,102,0.05),transparent_30%)]" />

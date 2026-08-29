@@ -167,12 +167,12 @@ export default function RoleDashboard() {
   const ActiveIcon = active.icon;
 
   return (
-    <section className="relative overflow-hidden px-6 py-28 sm:py-40">
+    <section className="relative overflow-hidden px-6 py-10 sm:py-14">
       {/* Huge background index */}
       <motion.div
         aria-hidden="true"
         style={{ y: sectionY }}
-        className="pointer-events-none absolute -left-24 top-0 select-none text-[18rem] font-black leading-none tracking-[-0.1em] text-white/[0.02] sm:text-[28rem]"
+        className="pointer-events-none absolute -left-24 top-0 select-none text-[12rem] font-black leading-none tracking-[-0.1em] text-white/[0.02] sm:text-[18rem]"
       >
         {active.number}
       </motion.div>
@@ -191,7 +191,7 @@ export default function RoleDashboard() {
                   : 'radial-gradient(circle, rgba(248,113,113,0.10), transparent 65%)',
         }}
         transition={{ duration: 0.6 }}
-        className="pointer-events-none absolute right-[-10%] top-[20%] h-[600px] w-[600px] rounded-full blur-[100px]"
+        className="pointer-events-none absolute right-[-10%] top-[20%] h-[450px] w-[450px] rounded-full blur-[100px]"
       />
 
       <motion.div
@@ -202,8 +202,8 @@ export default function RoleDashboard() {
         className="relative z-10 mx-auto max-w-7xl"
       >
         {/* Section heading */}
-        <div className="mb-14 max-w-5xl">
-          <div className="mb-5 flex items-center gap-3">
+        <div className="mb-6 max-w-5xl">
+          <div className="mb-3 flex items-center gap-3">
             <span className="h-px w-12 bg-[#00FF66]" />
 
             <span className="text-[10px] font-black tracking-[0.3em] text-[#00FF66]">
@@ -211,7 +211,7 @@ export default function RoleDashboard() {
             </span>
           </div>
 
-          <h2 className="text-5xl font-black uppercase leading-[0.88] tracking-[-0.06em] text-white sm:text-7xl md:text-8xl">
+          <h2 className="text-4xl font-black uppercase leading-[0.9] tracking-[-0.055em] text-white sm:text-5xl md:text-6xl">
             ENTER YOUR
             <br />
             <span className="text-white/20">SPORTORA </span>
@@ -220,15 +220,15 @@ export default function RoleDashboard() {
             </span>
           </h2>
 
-          <p className="mt-7 max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-white/55 sm:text-base">
             Whether you play, organize, officiate, or operate the platform —
             Sportora gives every role its own command center.
           </p>
         </div>
 
         {/* Role selector */}
-        <div className="relative mb-8 overflow-x-auto">
-          <div className="flex min-w-max gap-2 rounded-2xl border border-white/10 bg-white/[0.025] p-2 backdrop-blur-xl">
+        <div className="relative mb-5 overflow-x-auto">
+          <div className="flex min-w-max gap-2 rounded-2xl border border-white/10 bg-white/[0.025] p-1.5 backdrop-blur-xl">
             {ROLES.map((item) => {
               const data = ROLE_DATA[item];
               const Icon = data.icon;
@@ -238,7 +238,7 @@ export default function RoleDashboard() {
                 <button
                   key={item}
                   onClick={() => setRole(item)}
-                  className="relative flex items-center gap-3 rounded-xl px-5 py-3 text-left transition-all"
+                  className="relative flex items-center gap-3 rounded-xl px-4 py-2 text-left transition-all"
                 >
                   {selected && (
                     <motion.div
@@ -297,7 +297,7 @@ export default function RoleDashboard() {
               duration: 0.45,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.025] backdrop-blur-2xl"
+            className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.025] backdrop-blur-2xl"
           >
             {/* Top line */}
             <div
@@ -309,7 +309,7 @@ export default function RoleDashboard() {
 
             <div className="grid lg:grid-cols-[0.85fr_1.15fr]">
               {/* Identity panel */}
-              <div className="relative overflow-hidden border-b border-white/10 p-8 sm:p-12 lg:border-b-0 lg:border-r">
+              <div className="relative overflow-hidden border-b border-white/10 p-5 sm:p-7 lg:border-b-0 lg:border-r">
                 <div
                   aria-hidden="true"
                   className="absolute -right-10 -top-10 text-[13rem] font-black leading-none opacity-[0.035]"
@@ -319,20 +319,20 @@ export default function RoleDashboard() {
 
                 <div className="relative">
                   <div
-                    className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border"
+                    className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border"
                     style={{
                       borderColor: `${active.accent}40`,
                       backgroundColor: `${active.accent}0D`,
                     }}
                   >
                     <ActiveIcon
-                      className="h-7 w-7"
+                      className="h-5 w-5"
                       style={{ color: active.accent }}
                     />
                   </div>
 
                   <div
-                    className="mb-4 flex items-center gap-2 text-[9px] font-black tracking-[0.3em]"
+                    className="mb-3 flex items-center gap-2 text-[9px] font-black tracking-[0.3em]"
                     style={{ color: active.accent }}
                   >
                     <Activity className="h-3 w-3" />
@@ -347,11 +347,11 @@ export default function RoleDashboard() {
                     </span>
                   </h3>
 
-                  <p className="mt-7 max-w-md text-sm leading-7 text-white/55">
+                  <p className="mt-4 max-w-md text-sm leading-7 text-white/55">
                     {active.description}
                   </p>
 
-                  <div className="mt-10 flex items-center gap-3 text-[9px] font-black tracking-[0.25em] text-white/25">
+                  <div className="mt-6 flex items-center gap-3 text-[9px] font-black tracking-[0.25em] text-white/25">
                     <Zap
                       className="h-3.5 w-3.5"
                       style={{ color: active.accent }}
@@ -362,8 +362,8 @@ export default function RoleDashboard() {
               </div>
 
               {/* Features */}
-              <div className="p-5 sm:p-8 lg:p-10">
-                <div className="mb-7 flex items-center justify-between">
+              <div className="p-4 sm:p-6 lg:p-7">
+                <div className="mb-4 flex items-center justify-between">
                   <div>
                     <div className="text-[9px] font-black tracking-[0.3em] text-white/25">
                       ACTIVE MODULES
@@ -385,7 +385,7 @@ export default function RoleDashboard() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {active.features.map((feature, index) => {
                     const FeatureIcon = feature.icon;
 
@@ -398,10 +398,10 @@ export default function RoleDashboard() {
                           delay: 0.12 + index * 0.08,
                           duration: 0.4,
                         }}
-                        className="group flex items-center gap-5 rounded-2xl border border-white/10 bg-white/[0.025] p-5 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]"
+                        className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.025] p-3.5 transition-all duration-300 hover:border-white/20 hover:bg-white/[0.05]"
                       >
                         <div
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                           style={{
                             backgroundColor: `${active.accent}0D`,
                           }}

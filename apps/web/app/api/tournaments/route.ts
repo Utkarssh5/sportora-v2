@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 const API_URL =
   process.env.SPORTORA_API_URL || 'http://localhost:5000';
@@ -121,6 +122,82 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Tournament create proxy error:', error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unable to connect to Sportora API',
+      },
+      { status: 500 },
+    );
+  }
+}
+
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Tournament ID is required.',
+        },
+        { status: 400 },
+      );
+    }
+
+    const cookieStore = await cookies();
+
+    const accessToken =
+      cookieStore.get('accessToken')?.value;
+    const refreshToken =
+      cookieStore.get('refreshToken')?.value;
+
+    const authResult = await authenticatedFetch(
+      `/api/v1/tournament/${id}`,
+      accessToken,
+      refreshToken,
+      {
+        method: 'DELETE',
+      },
+    );
+
+    const response = authResult.response;
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            data.message ||
+            data.error ||
+            'Failed to delete tournament.',
+        },
+        { status: response.status },
+      );
+    }
+
+    const result = NextResponse.json(data, {
+      status: response.status,
+    });
+
+    if (authResult.refreshed) {
+      result.cookies.set('accessToken', authResult.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 15 * 60,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Tournament delete proxy error:', error);
 
     return NextResponse.json(
       {

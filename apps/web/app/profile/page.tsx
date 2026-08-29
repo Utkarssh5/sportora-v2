@@ -35,6 +35,7 @@ interface Profile {
   city?: string;
   state?: string;
   bio?: string;
+  primarySport?: string;
   interests?: string[];
   achievements?: string[];
   groundCrewAchievements?: {
@@ -303,10 +304,26 @@ function ProfileContent() {
   const [editBio, setEditBio] = useState('');
   const [editCity, setEditCity] = useState('');
   const [editState, setEditState] = useState('');
+  const [editPrimarySport, setEditPrimarySport] = useState('');
   const [editInterests, setEditInterests] = useState<string[]>([]);
   const [editAchievements, setEditAchievements] = useState<string[]>([]);
   const [newInterest, setNewInterest] = useState('');
   const [newAchievement, setNewAchievement] = useState('');
+
+  const availableSports = [
+    'Cricket',
+    'Football',
+    'Badminton',
+    'Table Tennis',
+    'Tennis',
+    'Basketball',
+    'Volleyball',
+    'Hockey',
+    'Athletics',
+    'Running',
+    'Swimming',
+    'Cycling',
+  ];
 
   const availableInterests = [
     'Cricket',
@@ -327,6 +344,7 @@ function ProfileContent() {
     setEditBio(profile?.bio || '');
     setEditCity(profile?.city || '');
     setEditState(profile?.state || '');
+    setEditPrimarySport(profile?.primarySport || '');
     setEditInterests(profile?.interests || []);
     setEditAchievements(profile?.achievements || []);
     setNewInterest('');
@@ -402,6 +420,7 @@ function ProfileContent() {
           bio: editBio.trim(),
           city: editCity.trim(),
           state: editState.trim(),
+          primarySport: editPrimarySport || '',
           interests: editInterests,
           achievements: editAchievements,
         }),
@@ -1027,10 +1046,7 @@ function ProfileContent() {
     }
   }
 
-  const primarySport =
-    registrations.length > 0
-      ? registrations[0]?.tournamentId?.sport || ''
-      : '';
+  const primarySport = profile?.primarySport || '';
 
   async function handleDownloadTicket() {
     if (!selectedRegistration) return;
@@ -1647,7 +1663,7 @@ function ProfileContent() {
                 </span>
                 <div className="mt-2 flex items-baseline gap-2">
                   <span className="text-lg sm:text-xl font-black uppercase tracking-tight text-cyan-300 truncate block">
-                    {primarySport || "Badminton"}
+                    {primarySport || "Not Set"}
                   </span>
                 </div>
               </div>
@@ -2655,92 +2671,169 @@ function ProfileContent() {
           )}
 
 
-        {/* EDIT PROFILE MODAL */}
-      {(activeSection === 'tickets'  ) && (
-            <div className="space-y-6 w-full animate-fadeIn">
-              <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-xl font-black italic uppercase tracking-wider text-white flex items-center gap-2">
-                    <Ticket className="w-5 h-5 text-[#00FF66]" />
-                    MY TOURNAMENT TICKETS
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Confirmed match passes and active entries for upcoming events.
-                  </p>
-                </div>
-                <span className="rounded-full bg-[#00FF66]/10 border border-[#00FF66]/30 px-3.5 py-1 text-xs font-black text-[#00FF66]">
-                  2 ACTIVE TICKETS
-                </span>
+        {/* TOURNAMENT TICKETS */}
+        {activeSection === 'tickets' && (
+          <div className="space-y-6 w-full animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <div>
+                <h2 className="text-xl font-black italic uppercase tracking-wider text-white flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-[#00FF66]" />
+                  MY TOURNAMENT TICKETS
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  Confirmed match passes and active entries for upcoming events.
+                </p>
               </div>
 
-              {/* Tickets Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                
-                {/* Ticket Card 1 */}
-                <div className="clean-glass relative overflow-hidden rounded-3xl border border-white/10 p-6 flex flex-col justify-between hover:border-[#00FF66]/40 transition group">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="rounded-full bg-[#00FF66]/10 border border-[#00FF66]/30 px-3 py-1 text-[10px] font-black uppercase text-[#00FF66]">
-                        CONFIRMED PASS
-                      </span>
-                      <span className="font-mono text-xs text-gray-400 font-bold">#SPT-BDM-01</span>
-                    </div>
-                    <h3 className="text-lg font-black uppercase text-white group-hover:text-[#00FF66] transition">
-                      State Badminton Open 2026
-                    </h3>
-                    <p className="text-xs text-gray-400">
-                      Bareilly Indoor Sports Complex • Singles Main Draw
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] text-gray-500 font-bold uppercase">ENTRY STATUS</div>
-                      <div className="text-xs font-black text-white">READY TO PLAY</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded-full bg-[#00FF66] px-4 py-2 text-xs font-black uppercase text-black hover:bg-[#00FF66]/90 transition"
-                    >
-                      VIEW QR PASS
-                    </button>
-                  </div>
-                </div>
-
-                {/* Ticket Card 2 */}
-                <div className="clean-glass relative overflow-hidden rounded-3xl border border-white/10 p-6 flex flex-col justify-between hover:border-cyan-400/40 transition group">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="rounded-full bg-cyan-400/10 border border-cyan-400/30 px-3 py-1 text-[10px] font-black uppercase text-cyan-400">
-                        CONFIRMED PASS
-                      </span>
-                      <span className="font-mono text-xs text-gray-400 font-bold">#SPT-CRK-02</span>
-                    </div>
-                    <h3 className="text-lg font-black uppercase text-white group-hover:text-cyan-400 transition">
-                      UP Premier Cricket League
-                    </h3>
-                    <p className="text-xs text-gray-400">
-                      Green Park Stadium • All-Rounder Slot
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] text-gray-500 font-bold uppercase">ENTRY STATUS</div>
-                      <div className="text-xs font-black text-white">VERIFIED</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded-full bg-cyan-400 px-4 py-2 text-xs font-black uppercase text-black hover:bg-cyan-300 transition"
-                    >
-                      VIEW QR PASS
-                    </button>
-                  </div>
-                </div>
-
-              </div>
+              <span className="rounded-full bg-[#00FF66]/10 border border-[#00FF66]/30 px-3.5 py-1 text-xs font-black text-[#00FF66]">
+                {registrations.filter(
+                  (registration) => registration.status !== 'CANCELLED'
+                ).length} ACTIVE TICKETS
+              </span>
             </div>
-          )}
+
+            {registrationsLoading ? (
+              <div className="clean-glass rounded-3xl border border-white/10 p-10 text-center">
+                <p className="text-sm font-bold text-gray-400">
+                  LOADING MATCH PASSES...
+                </p>
+              </div>
+            ) : registrationsError ? (
+              <div className="clean-glass rounded-3xl border border-red-400/20 bg-red-400/5 p-8 text-center">
+                <p className="text-sm font-bold text-red-400">
+                  {registrationsError}
+                </p>
+              </div>
+            ) : registrations.length === 0 ? (
+              <div className="clean-glass rounded-3xl border border-dashed border-white/10 p-10 text-center">
+                <Ticket className="mx-auto h-10 w-10 text-gray-500" />
+
+                <h3 className="mt-4 text-sm font-black uppercase text-white">
+                  NO ACTIVE MATCH PASSES
+                </h3>
+
+                <p className="mt-2 text-xs text-gray-400">
+                  Register for a tournament to receive your QR match pass.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                {registrations
+                  .filter(
+                    (registration) =>
+                      registration.status !== 'CANCELLED'
+                  )
+                  .map((registration) => {
+                    const tournament = registration.tournamentId;
+
+                    const tournamentTitle =
+                      tournament?.title || 'SPORTORA TOURNAMENT';
+
+                    const sport =
+                      tournament?.sport || 'SPORTS EVENT';
+
+                    const registrationId =
+                      registration._id;
+
+                    const openQrPass = () => {
+                      navigateWithinProfile(
+                        `/profile?section=tickets&registration=${encodeURIComponent(
+                          registrationId
+                        )}`
+                      );
+                    };
+
+                    return (
+                      <div
+                        key={registrationId}
+                        className="clean-glass relative overflow-hidden rounded-3xl border border-white/10 p-6 flex flex-col justify-between hover:border-[#00FF66]/40 transition group"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="rounded-full bg-[#00FF66]/10 border border-[#00FF66]/30 px-3 py-1 text-[10px] font-black uppercase text-[#00FF66]">
+                              CONFIRMED PASS
+                            </span>
+
+                            <span className="font-mono text-[10px] text-gray-400 font-bold truncate max-w-[150px]">
+                              #{registrationId.slice(-8).toUpperCase()}
+                            </span>
+                          </div>
+
+                          <h3 className="text-lg font-black uppercase text-white group-hover:text-[#00FF66] transition">
+                            {tournamentTitle}
+                          </h3>
+
+                          <p className="text-xs text-gray-400">
+                            {sport} • Registration confirmed
+                          </p>
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between gap-4">
+                          <div>
+                            <div className="text-[10px] text-gray-500 font-bold uppercase">
+                              ENTRY STATUS
+                            </div>
+
+                            <div className="text-xs font-black text-white">
+                              {registration.status || 'CONFIRMED'}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={openQrPass}
+                            className="rounded-full bg-[#00FF66] px-4 py-2 text-xs font-black uppercase text-black hover:bg-[#00FF66]/90 transition"
+                          >
+                            VIEW QR PASS
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+            {/* Existing selected registration is opened through the URL. */}
+            {selectedRegistration && (
+              <div className="clean-glass rounded-3xl border border-[#00FF66]/20 bg-[#00FF66]/5 p-6">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00FF66]">
+                      MATCH PASS READY
+                    </div>
+
+                    <h3 className="mt-2 text-lg font-black uppercase text-white">
+                      {selectedRegistration.tournamentId?.title ||
+                        'Tournament Match Pass'}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-gray-400">
+                      QR verification pass generated for registration.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadTicket}
+                    disabled={downloadingTicket}
+                    className="rounded-full bg-[#00FF66] px-5 py-3 text-xs font-black uppercase text-black transition hover:bg-[#00FF66]/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {downloadingTicket
+                      ? 'GENERATING PASS...'
+                      : 'DOWNLOAD MATCH PASS'}
+                  </button>
+                </div>
+
+                <div className="mt-6 flex justify-center rounded-3xl bg-white p-6">
+                  <QRCode
+                    value={`${window.location.origin}/verify/registration/${selectedRegistration._id}`}
+                    size={220}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
           {isEditingProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
@@ -2761,11 +2854,29 @@ function ProfileContent() {
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                  Primary Sport
+                </label>
+                <select
+                  value={editPrimarySport}
+                  onChange={(e) => setEditPrimarySport(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
+                >
+                  <option value="">Select your primary sport</option>
+                  {availableSports.map((sport) => (
+                    <option key={sport} value={sport}>
+                      {sport}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
                   Bio
                 </label>
                 <textarea
-                  value={bioInput}
-                  onChange={(e) => setBioInput(e.target.value)}
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
                   rows={3}
                   className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
                   placeholder="Tell us about yourself..."
@@ -2778,8 +2889,8 @@ function ProfileContent() {
                 </label>
                 <input
                   type="text"
-                  value={interestsInput}
-                  onChange={(e) => setInterestsInput(e.target.value)}
+                  value={editInterests.join(", ")}
+                  onChange={(e) => setEditInterests(e.target.value.split(",").map((item) => item.trim()).filter(Boolean))}
                   className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
                   placeholder="Cricket, Football, Badminton"
                 />

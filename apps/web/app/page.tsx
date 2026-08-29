@@ -67,7 +67,7 @@ export default function Home() {
       <RoleDashboard />
 
       {/* Final homepage closing section */}
-      <section className="relative overflow-hidden border-t border-white/10 px-5 py-24 sm:px-8 lg:px-12">
+      <section className="relative overflow-hidden border-t border-white/10 px-5 py-12 sm:px-8 lg:px-12">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#00ff66]/[0.05] blur-[110px]"
@@ -80,7 +80,7 @@ export default function Home() {
             <span>YOUR NEXT MOVE</span>
           </div>
 
-          <div className="mt-10 grid gap-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.3em] text-[#00ff66]">
                 THE ARENA IS ALWAYS MOVING
@@ -153,7 +153,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-16 flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-8 flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
               DISCOVER • COMPETE • ORGANIZE
             </span>
@@ -165,14 +165,14 @@ export default function Home() {
         </div>
       </section>
       {/* SPORTORA FOOTER */}
-      <footer className="relative overflow-hidden border-t border-white/10 bg-[#05070a] px-5 pb-8 pt-16 sm:px-8 lg:px-12">
+      <footer className="relative overflow-hidden border-t border-white/10 bg-[#05070a] px-5 pb-6 pt-10 sm:px-8 lg:px-12">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#00ff66]/[0.035] blur-[100px]"
         />
 
         <div className="relative mx-auto max-w-6xl">
-          <div className="grid gap-12 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+          <div className="grid gap-7 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#00ff66]/30 bg-[#00ff66]/[0.08] text-lg font-black text-[#00ff66]">
@@ -321,13 +321,24 @@ export default function Home() {
                 © 2026 SPORTORA.V2 — ALL RIGHTS RESERVED
               </span>
 
-              <div className="flex gap-5">
+              <div className="flex flex-wrap gap-5">
                 <span className="transition-colors hover:text-white/50">
                   PRIVACY
                 </span>
+
                 <span className="transition-colors hover:text-white/50">
                   TERMS
                 </span>
+
+                <a
+                  href="https://www.youtube.com/@SportoraOfficial"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-[#00ff66]"
+                >
+                  YOUTUBE
+                </a>
+
                 <span className="transition-colors hover:text-white/50">
                   INDIA / SPORTS NETWORK
                 </span>

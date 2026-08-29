@@ -20,6 +20,7 @@ export class UserService {
       bio?: string;
       city?: string;
       state?: string;
+      primarySport?: string;
       interests?: string[];
       achievements?: string[];
     }

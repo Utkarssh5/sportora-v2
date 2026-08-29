@@ -90,6 +90,11 @@ export class UserController {
           ? body.state.trim().slice(0, 100)
           : undefined;
 
+      const primarySport =
+        typeof body.primarySport === "string"
+          ? body.primarySport.trim().slice(0, 50)
+          : undefined;
+
       const interests =
         Array.isArray(body.interests)
           ? body.interests
@@ -119,6 +124,7 @@ export class UserController {
           bio,
           city,
           state,
+          primarySport,
           interests,
           achievements,
         });
