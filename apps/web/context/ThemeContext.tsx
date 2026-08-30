@@ -22,7 +22,7 @@ const MOTIVATIONAL_QUOTES = [
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentQuote, setCurrentQuote] = useState('');
   const [mounted, setMounted] = useState(false);
