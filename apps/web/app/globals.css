@@ -226,7 +226,7 @@ body {
 }
 
 /* =========================================================
-   GLASS CARDS & CONTAINERS
+   GLASS CARDS & TOURNAMENT CONTAINERS
    ========================================================= */
 
 .clean-glass {
@@ -360,7 +360,7 @@ body {
 }
 
 /* =========================================================
-   DIVIDERS & SEPARATION LINES (High Visibility in Light Mode)
+   DIVIDERS & SEPARATION LINES
    ========================================================= */
 
 .arena-divider {
@@ -387,10 +387,30 @@ body {
   opacity: 1 !important;
 }
 
-/* Footer and Section Top Borders */
-[data-theme="light"] footer,
-[data-theme="light"] [class*="border-t"] {
-  border-top-color: rgba(56, 189, 248, 0.5) !important;
+/* =========================================================
+   TOURNAMENT CARD IMAGES & POSTER PROTECTION
+   (Fixes Left Image Hide Issue)
+   ========================================================= */
+
+[data-theme="light"] img,
+[data-theme="light"] [class*="bg-[url"],
+[data-theme="light"] [class*="bg-cover"],
+[data-theme="light"] [style*="background-image"],
+[data-theme="light"] [class*="aspect-"],
+[data-theme="light"] .tournament-card-image,
+[data-theme="light"] .tournament-image-container {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  background-color: transparent !important;
+}
+
+/* Left side banner badge inside card */
+[data-theme="light"] [class*="AWAITING"],
+[data-theme="light"] [class*="UPCOMING"],
+[data-theme="light"] [class*="LIVE"] {
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* =========================================================
@@ -418,27 +438,13 @@ body {
   background-color: transparent !important;
 }
 
-/* Light Cards */
-[data-theme="light"] .rounded-2xl,
-[data-theme="light"] .rounded-3xl,
-[data-theme="light"] .rounded-xl,
-[data-theme="light"] [class*="bg-white/"],
-[data-theme="light"] [class*="bg-slate-900/"],
-[data-theme="light"] [class*="bg-black/"] {
+/* Light Cards (Excludes image containers) */
+[data-theme="light"] .rounded-2xl:not(:has(img)),
+[data-theme="light"] .rounded-3xl:not(:has(img)),
+[data-theme="light"] [class*="bg-white/"]:not([class*="bg-cover"]),
+[data-theme="light"] [class*="bg-slate-900/"]:not([class*="bg-cover"]) {
   background-color: rgba(255, 255, 255, 0.94) !important;
   border-color: rgba(186, 230, 253, 0.8) !important;
-}
-
-/* Background Gradients */
-[data-theme="light"] [class*="from-slate-"],
-[data-theme="light"] [class*="from-black"],
-[data-theme="light"] [class*="from-zinc-"],
-[data-theme="light"] [class*="to-slate-"],
-[data-theme="light"] [class*="to-black"],
-[data-theme="light"] [class*="to-zinc-"] {
-  --tw-gradient-from: rgba(255, 255, 255, 0.95) var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgba(224, 242, 254, 0.85) var(--tw-gradient-to-position) !important;
-  background-color: #ffffff !important;
 }
 
 /* =========================================================
@@ -495,7 +501,7 @@ body {
   color: #334155 !important;
 }
 
-/* Uppercase Subtitle Tags / Taglines */
+/* Uppercase subtitle tags */
 [data-theme="light"] [class*="tracking-widest"],
 [data-theme="light"] [class*="tracking-wider"],
 [data-theme="light"] [class*="tracking-[0."],
@@ -503,6 +509,15 @@ body {
 [data-theme="light"] [class*="uppercase"][class*="text-sm"] {
   color: #0369a1 !important;
   font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+/* Accent Lines */
+[data-theme="light"] [class*="h-[2px]"],
+[data-theme="light"] [class*="h-0.5"][class*="bg-"],
+[data-theme="light"] [class*="w-8"][class*="bg-"],
+[data-theme="light"] [class*="w-12"][class*="bg-"] {
+  background-color: #0284c7 !important;
   opacity: 1 !important;
 }
 
