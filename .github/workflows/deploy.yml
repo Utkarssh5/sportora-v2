@@ -1,115 +1,94 @@
-name: Sportora V2 Enterprise CI/CD Pipeline
+name: Sportora V2 CI/CD
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - frontend-redesign
+
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - frontend-redesign
 
 jobs:
-  # -------------------------------------------------------------
-  # JOB 1: LINT & TYPECHECK
-  # -------------------------------------------------------------
-  lint-and-typecheck:
-    name: 🧹 Code Linting & Type Validation
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Source Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
 
-      - name: Install Dependencies (Web App)
-        run: |
-          cd apps/web
-          npm ci
+      - name: Install Web Dependencies
+        working-directory: apps/web
+        run: npm ci
 
-      - name: Run Next.js Build & Type Check
-        run: |
-          cd apps/web
-          npm run build
+      - name: Build Web
+        working-directory: apps/web
         env:
           MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
-          JWT_SECRET: "ci_cd_production_test_secret"
+          JWT_SECRET: "ci_cd_test_secret"
+        run: npm run build
 
-  # -------------------------------------------------------------
-  # JOB 2: AUTOMATED TESTS
-  # -------------------------------------------------------------
-  run-tests:
-    name: 🧪 Automated Test Suite Execution
-    needs: lint-and-typecheck
-    runs-on: ubuntu-latest
+      - name: Run Web Tests
+        working-directory: apps/web
+        run: npm run test
 
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: |
-          cd apps/web
-          npm ci
-
-      - name: Execute Tests
-        run: |
-          cd apps/web
-          npm run test
-
-  # -------------------------------------------------------------
-  # JOB 3: MULTI-STAGE DOCKER BUILD & VERIFICATION
-  # -------------------------------------------------------------
-  docker-build-and-push:
-    name: 🐳 Docker Multi-Stage Image Build
-    needs: run-tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Web App Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./apps/web
-          file: ./apps/web/Dockerfile
-          push: false
-          tags: sportora/web:latest,sportora/web:${{ github.sha }}
-
-      - name: Build API Service Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./apps/api
-          file: ./apps/api/Dockerfile
-          push: false
-          tags: sportora/api:latest,sportora/api:${{ github.sha }}
-
-  # -------------------------------------------------------------
-  # JOB 4: AUTOMATED PRODUCTION DEPLOYMENT
-  # -------------------------------------------------------------
   deploy:
-    name: 🚀 Production Deployment Trigger
-    needs: docker-build-and-push
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    name: Deploy to EC2
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/frontend-redesign'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy Confirmation Message
-        run: |
-          echo "========================================================="
-          echo "Sportora V2 CI/CD Pipeline Passed All Quality Gates! 🏆"
-          echo "Triggering Deployment Hook to Production Infrastructure..."
-          echo "Commit SHA: ${{ github.sha }}"
-          echo "========================================================="
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "========================================"
+            echo "Starting Sportora production deployment"
+            echo "========================================"
+
+            cd ~/Projects/sportora-v2
+
+            echo "Pulling latest code..."
+            git pull origin frontend-redesign
+
+            echo "Building API..."
+            cd apps/api
+            pnpm install --frozen-lockfile
+            pnpm run build
+
+            echo "Building Web..."
+            cd ../web
+            pnpm install --frozen-lockfile
+            rm -rf .next
+            pnpm run build
+
+            echo "Restarting API..."
+            PM2="/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2"
+            $PM2 restart sportora-api
+
+            echo "Restarting Web..."
+            $PM2 restart sportora-web
+
+            echo "Saving PM2 process list..."
+            $PM2 save
+
+            echo "Checking application status..."
+            $PM2 status
+
+            echo "========================================"
+            echo "Sportora deployment completed!"
+            echo "========================================"
