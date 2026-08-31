@@ -49,12 +49,10 @@ jobs:
           MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
           JWT_SECRET: "ci_cd_test_secret"
 
-    deploy:
+  deploy:
     name: Deploy to EC2
     needs: build-and-test
-
     if: github.event_name == 'push' && github.ref == 'refs/heads/frontend-redesign'
-
     runs-on: ubuntu-latest
 
     steps:
@@ -72,7 +70,6 @@ jobs:
             echo "Starting Sportora deployment"
             echo "======================================"
 
-            # Load Node.js/Corepack environment
             export PATH="/home/ubuntu/.nvm/versions/node/v24.20.0/bin:$PATH"
 
             COREPACK="/home/ubuntu/.nvm/versions/node/v24.20.0/bin/corepack"
@@ -106,7 +103,7 @@ jobs:
             echo "Restarting PM2 processes..."
             cd ../..
 
-            PM2="/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2"
+            PM2="/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2"
 
             echo "Restarting API..."
             $PM2 restart sportora-api
