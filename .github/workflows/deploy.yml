@@ -52,7 +52,9 @@ jobs:
   deploy:
     name: Deploy to EC2
     needs: build-and-test
+
     if: github.event_name == 'push' && github.ref == 'refs/heads/frontend-redesign'
+
     runs-on: ubuntu-latest
 
     steps:
@@ -69,6 +71,8 @@ jobs:
             echo "======================================"
             echo "Starting Sportora deployment"
             echo "======================================"
+
+            echo "Loading Node.js..."
 
             export PATH="/home/ubuntu/.nvm/versions/node/v24.20.0/bin:$PATH"
 
@@ -100,10 +104,21 @@ jobs:
             rm -rf .next
             $COREPACK pnpm run build
 
-            echo "Restarting PM2 processes..."
-            cd ../..
+            echo "Finding PM2..."
 
-            PM2="/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2"
+            PM2="$(find /home/ubuntu/.local/share/pnpm/store \
+              -path '*/pm2/bin/pm2' \
+              -type f \
+              -print \
+              -quit)"
+
+            if [ -z "$PM2" ]; then
+              echo "ERROR: PM2 executable not found"
+              exit 1
+            fi
+
+            echo "Using PM2:"
+            echo "$PM2"
 
             echo "Restarting API..."
             $PM2 restart sportora-api
@@ -114,8 +129,10 @@ jobs:
             echo "Saving PM2 process list..."
             $PM2 save
 
-            echo "Checking Next.js..."
+            echo "Waiting for Web..."
             sleep 5
+
+            echo "Checking Next.js..."
             curl -f http://127.0.0.1:3000 > /dev/null
 
             echo "Checking Nginx..."
