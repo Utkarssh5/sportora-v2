@@ -44,8 +44,8 @@ jobs:
           MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
           JWT_SECRET: "ci_cd_test_secret"
 
-      - name: Run Web Tests
-        run: pnpm --dir apps/web run test
+      - name: Run Tests
+        run: pnpm test
         env:
           MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
           JWT_SECRET: "ci_cd_test_secret"
