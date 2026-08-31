@@ -1,4 +1,4 @@
-name: Sportora V2 CI/CD
+name: Sportora V2 CI/CD Pipeline
 
 on:
   push:
@@ -9,41 +9,58 @@ on:
     branches:
       - frontend-redesign
 
+permissions:
+  contents: read
+
 jobs:
+  # ============================================================
+  # JOB 1: BUILD & TEST
+  # ============================================================
   build-and-test:
-    name: Build & Test
+    name: 🧪 Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          node-version: 24
 
-      - name: Install Web Dependencies
-        working-directory: apps/web
-        run: npm ci
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+          run_install: false
 
-      - name: Build Web
-        working-directory: apps/web
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web App
+        run: pnpm --dir apps/web run build
         env:
           MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
           JWT_SECRET: "ci_cd_test_secret"
-        run: npm run build
 
       - name: Run Web Tests
-        working-directory: apps/web
-        run: npm run test
+        run: pnpm --dir apps/web run test
+        env:
+          MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
+          JWT_SECRET: "ci_cd_test_secret"
 
+  # ============================================================
+  # JOB 2: DEPLOY TO EC2
+  # Only runs after Build & Test succeeds
+  # ============================================================
   deploy:
-    name: Deploy to EC2
+    name: 🚀 Deploy to EC2
     needs: build-and-test
+
+    # Don't deploy pull requests
     if: github.event_name == 'push' && github.ref == 'refs/heads/frontend-redesign'
+
     runs-on: ubuntu-latest
 
     steps:
@@ -53,42 +70,53 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
           script: |
             set -e
 
-            echo "========================================"
-            echo "Starting Sportora production deployment"
-            echo "========================================"
+            echo "=============================================="
+            echo "🚀 Sportora V2 Production Deployment Started"
+            echo "Commit: $GITHUB_SHA"
+            echo "=============================================="
 
             cd ~/Projects/sportora-v2
 
-            echo "Pulling latest code..."
-            git pull origin frontend-redesign
+            echo "📥 Pulling latest code..."
+            git fetch origin frontend-redesign
+            git reset --hard origin/frontend-redesign
 
-            echo "Building API..."
-            cd apps/api
+            echo "📦 Installing workspace dependencies..."
             pnpm install --frozen-lockfile
+
+            echo "🔨 Building API..."
+            cd apps/api
             pnpm run build
 
-            echo "Building Web..."
+            echo "🔨 Building Web..."
             cd ../web
-            pnpm install --frozen-lockfile
+
             rm -rf .next
             pnpm run build
 
-            echo "Restarting API..."
+            echo "🔄 Restarting API..."
+            cd ../..
             PM2="/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2"
+
             $PM2 restart sportora-api
 
-            echo "Restarting Web..."
+            echo "🔄 Restarting Web..."
             $PM2 restart sportora-web
 
-            echo "Saving PM2 process list..."
+            echo "💾 Saving PM2 process list..."
             $PM2 save
 
-            echo "Checking application status..."
-            $PM2 status
+            echo "🏥 Checking Web..."
+            sleep 5
+            curl -f http://127.0.0.1:3000 > /dev/null
 
-            echo "========================================"
-            echo "Sportora deployment completed!"
-            echo "========================================"
+            echo "🏥 Checking Nginx..."
+            sudo systemctl is-active --quiet nginx
+
+            echo "=============================================="
+            echo "✅ Sportora V2 Deployment Successful!"
+            echo "=============================================="
