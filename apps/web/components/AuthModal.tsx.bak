@@ -56,8 +56,6 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [showLoginOtp, setShowLoginOtp] = useState(false);
-  const [loginOtp, setLoginOtp] = useState('');
 
   if (!isOpen) return null;
 
@@ -81,7 +79,7 @@ export default function AuthModal({
     try {
       const endpoint =
         mode === 'login'
-          ? '/api/auth/otp/login/send'
+          ? '/api/auth/login'
           : '/api/auth/signup';
 
       const body =
@@ -142,82 +140,6 @@ export default function AuthModal({
         return;
       }
 
-      if (mode === 'login') {
-        setShowLoginOtp(true);
-        setLoginOtp('');
-        setError('');
-        return;
-      }
-
-      const user: AuthUser | undefined = data.data?.user;
-
-      if (user) {
-        localStorage.setItem(
-          'sportoraUser',
-          JSON.stringify(user),
-        );
-
-        window.dispatchEvent(
-          new CustomEvent('sportora-auth-change', {
-            detail: user,
-          }),
-        );
-      }
-
-      if (user?.role === 'ADMIN') {
-        window.location.href = user.mustChangePassword
-          ? '/admin/change-password'
-          : '/admin';
-
-        return;
-      }
-
-      setIsSuccess(true);
-
-      setTimeout(() => {
-        setIsSuccess(false);
-        onClose();
-      }, 1200);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Something went wrong. Please try again.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleLoginOtpVerify(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/auth/otp/login/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          email,
-          otp: loginOtp,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.error ||
-            data.message ||
-            'Invalid OTP',
-        );
-      }
-
       const user: AuthUser | undefined = data.user;
 
       if (user) {
@@ -251,7 +173,7 @@ export default function AuthModal({
       setError(
         err instanceof Error
           ? err.message
-          : 'Invalid OTP. Please try again.',
+          : 'Something went wrong. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -388,79 +310,10 @@ export default function AuthModal({
                 </motion.div>
               )}
 
-              {showLoginOtp && mode === 'login' ? (
-                <form
-                  onSubmit={handleLoginOtpVerify}
-                  className="space-y-5"
-                >
-                  <div className="text-center py-4">
-                    <div className="mx-auto mb-5 w-16 h-16 rounded-2xl bg-[#00FF66]/10 border border-[#00FF66]/30 flex items-center justify-center">
-                      <ShieldCheck className="w-8 h-8 text-[#00FF66]" />
-                    </div>
-
-                    <h3 className="text-2xl font-black text-white uppercase italic">
-                      VERIFY LOGIN
-                    </h3>
-
-                    <p className="mt-2 text-xs text-gray-400">
-                      We sent a 6-digit OTP to
-                    </p>
-
-                    <p className="mt-1 text-xs font-bold text-[#00FF66] break-all">
-                      {email}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-extrabold text-gray-400 uppercase mb-2">
-                      ENTER OTP
-                    </label>
-
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={6}
-                      required
-                      value={loginOtp}
-                      onChange={(e) =>
-                        setLoginOtp(
-                          e.target.value.replace(/\\D/g, '').slice(0, 6),
-                        )
-                      }
-                      placeholder="000000"
-                      disabled={loading}
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-center text-white text-2xl font-black tracking-[0.5em] outline-none focus:border-[#00FF66] transition-colors disabled:opacity-50"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading || loginOtp.length !== 6}
-                    className="w-full py-4 bg-gradient-to-r from-[#00FF66] to-emerald-400 text-black font-black text-xs uppercase tracking-widest rounded-2xl hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00FF66]/30 disabled:opacity-50 italic"
-                  >
-                    {loading ? 'VERIFYING...' : 'VERIFY OTP'}
-                    {!loading && <ArrowRight className="w-4 h-4" />}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => {
-                      setShowLoginOtp(false);
-                      setLoginOtp('');
-                      setError('');
-                    }}
-                    className="w-full text-xs text-gray-400 hover:text-white transition-colors"
-                  >
-                    ← Back to login
-                  </button>
-                </form>
-              ) : (
-                <form
-                  onSubmit={handleSubmit}
-                  className="space-y-4"
-                >
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4"
+              >
 
                 {mode === 'signup' && (
                   <div>
@@ -756,7 +609,6 @@ export default function AuthModal({
                 </button>
 
               </form>
-              )}
             </div>
           )}
 

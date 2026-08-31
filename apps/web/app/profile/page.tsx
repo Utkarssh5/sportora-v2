@@ -1723,7 +1723,7 @@ function ProfileContent() {
                   const Icon = item.icon;
                   const active = activeSection === item.id;
 
-                  return (
+  return (
                     <button
                       key={item.id}
                       type="button"
@@ -1870,19 +1870,72 @@ function ProfileContent() {
                     </h2>
                   </div>
 
-                  <span className="text-sm font-black text-[#00FF66]">100%</span>
+                  <span className="text-sm font-black text-[#00FF66]">
+                    {(() => {
+                      if (!profile) return 0;
+
+                      let score = 0;
+
+                      if (profile.fullName?.trim()) score += 20;
+                      if (profile.phone?.trim()) score += 20;
+                      if (profile.city?.trim()) score += 7.5;
+                      if (profile.state?.trim()) score += 7.5;
+                      if (profile.bio?.trim()) score += 10;
+                      if (profile.primarySport?.trim()) score += 10;
+                      if (profile.interests?.length) score += 15;
+                      if (profile.achievements?.length) score += 10;
+
+                      return Math.round(score);
+                    })()}%
+                  </span>
                 </div>
 
                 <div className="space-y-3">
                   <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
                     <div
                       className="h-full rounded-full bg-[#00FF66] shadow-[0_0_12px_#00FF66]"
-                      style={{ width: '100%' }}
+                      style={{
+                        width: `${(() => {
+                          if (!profile) return 0;
+
+                          let score = 0;
+
+                          if (profile.fullName?.trim()) score += 20;
+                          if (profile.phone?.trim()) score += 20;
+                          if (profile.city?.trim()) score += 7.5;
+                          if (profile.state?.trim()) score += 7.5;
+                          if (profile.bio?.trim()) score += 10;
+                          if (profile.primarySport?.trim()) score += 10;
+                          if (profile.interests?.length) score += 15;
+                          if (profile.achievements?.length) score += 10;
+
+                          return Math.round(score);
+                        })()}%`,
+                      }}
                     />
                   </div>
 
                   <p className="text-xs text-gray-400">
-                    Add your interests and achievements to make your profile stand out.
+                    {(() => {
+                      if (!profile) {
+                        return 'Complete your profile to make your profile stand out.';
+                      }
+
+                      let score = 0;
+
+                      if (profile.fullName?.trim()) score += 20;
+                      if (profile.phone?.trim()) score += 20;
+                      if (profile.city?.trim()) score += 7.5;
+                      if (profile.state?.trim()) score += 7.5;
+                      if (profile.bio?.trim()) score += 10;
+                      if (profile.primarySport?.trim()) score += 10;
+                      if (profile.interests?.length) score += 15;
+                      if (profile.achievements?.length) score += 10;
+
+                      return Math.round(score) === 100
+                        ? 'Your profile is complete. Great job!'
+                        : 'Complete your profile to make your profile stand out.';
+                    })()}
                   </p>
                 </div>
               </div>

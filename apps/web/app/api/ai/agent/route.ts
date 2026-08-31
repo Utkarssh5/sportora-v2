@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_URL =
-  process.env.SPORTORA_API_URL || "http://localhost:5000";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 
 export async function POST(req: Request) {
   try {
@@ -11,15 +9,17 @@ export async function POST(req: Request) {
     const accessToken =
       cookieStore.get("accessToken")?.value;
 
-    if (!accessToken) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Authentication required.",
-        },
-        { status: 401 }
-      );
-    }
+    const refreshToken =
+      cookieStore.get("refreshToken")?.value;
+
+    console.log("[AI AUTH DEBUG]", {
+      hasAccessToken: !!accessToken,
+      accessTokenLength: accessToken?.length || 0,
+      hasRefreshToken: !!refreshToken,
+      refreshTokenLength: refreshToken?.length || 0,
+      nodeEnv: process.env.NODE_ENV,
+      apiUrl: API_URL,
+    });
 
     const body = await req.json();
 
@@ -44,13 +44,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const response = await fetch(
-      `${API_URL}/api/v1/ai/chat`,
+    const authResult = await authenticatedFetch(
+      "/api/v1/ai/chat",
+      accessToken,
+      refreshToken,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           prompt,
@@ -58,20 +59,36 @@ export async function POST(req: Request) {
             ? { conversationId }
             : {}),
         }),
-        cache: "no-store",
       }
     );
 
+    const response = authResult.response;
+
     const data = await response.json();
 
-    return NextResponse.json(data, {
+    const result = NextResponse.json(data, {
       status: response.status,
     });
+
+    /*
+     * authenticatedFetch() may have refreshed the
+     * access token using refreshToken.
+     *
+     * Persist the new access token in the browser cookie.
+     */
+    if (authResult.refreshed) {
+      result.cookies.set("accessToken", authResult.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 15 * 60,
+      });
+    }
+
+    return result;
   } catch (error: any) {
-    console.error(
-      "Sportora AI proxy error:",
-      error
-    );
+    console.error("Sportora AI proxy error:", error);
 
     return NextResponse.json(
       {

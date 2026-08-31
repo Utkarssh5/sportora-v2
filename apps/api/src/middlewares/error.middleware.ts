@@ -34,6 +34,25 @@ export function errorHandler(
     });
   }
 
+  // OTP / Authentication Errors
+  if (
+    err.message === "Invalid OTP." ||
+    err.message === "OTP expired or not requested." ||
+    err.message === "OTP has expired."
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
+  if (err.message === "Please verify your email before logging in.") {
+    return res.status(403).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
   // Payment Gateway Configuration
   if (err.message === "Payment gateway is not configured.") {
     return res.status(503).json({

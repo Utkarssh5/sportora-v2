@@ -28,11 +28,9 @@ export const tournamentTools = {
 
       const now = new Date();
 
-      // Keep AI tournament discovery aligned with the normal
-      // tournament listing API. Do not hard-code APPROVED here,
-      // because the live listing can contain tournaments whose
-      // workflow status is still PENDING_APPROVAL.
-      const filter: Record<string, unknown> = {};
+      const filter: Record<string, unknown> = {
+        status: "APPROVED",
+      };
 
       /*
        * Tournament status is derived from start/end dates.
@@ -74,11 +72,18 @@ export const tournamentTools = {
         requestedStatus === "PAST"
       ) {
         filter.endDate = { $lt: now };
+        filter.registrationDeadline = {
+          $gt: now,
+        };
       } else {
         /*
-         * No explicit status filter.
-         * Match the normal tournament listing behaviour.
+         * Default and unknown-status discovery must preserve the
+         * existing safety rule: only approved tournaments with
+         * an open registration deadline are discoverable.
          */
+        filter.registrationDeadline = {
+          $gt: now,
+        };
       }
 
       if (args.search) {

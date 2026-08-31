@@ -1,0 +1,26 @@
+[0;1;32m●[0m pm2-ubuntu.service - PM2 process manager
+     Loaded: loaded (]8;;file://ip-172-31-12-115/etc/systemd/system/pm2-ubuntu.service/etc/systemd/system/pm2-ubuntu.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Sun 2026-08-30 04:48:04 UTC; 3h 56min ago
+       Docs: ]8;;https://pm2.keymetrics.io/https://pm2.keymetrics.io/]8;;
+    Process: 532 ExecStart=/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2 resurrect (code=exited, status=0/SUCCESS)
+   Main PID: 910 (PM2 v7.0.4: God)
+      Tasks: 45 (limit: 627)
+     Memory: 257.3M (peak: 400.6M swap: 101.7M swap peak: 242.8M)
+        CPU: 6min 43.530s
+     CGroup: /system.slice/pm2-ubuntu.service
+             ├─[0;38;5;245m  910 "PM2 v7.0.4: God Daemon (/home/ubuntu/.pm2)"[0m
+             ├─[0;38;5;245m  933 "node /home/ubuntu/Projects/sportora-v2/apps/api/dist/server.js"[0m
+             ├─[0;38;5;245m12114 node /home/ubuntu/.nvm/versions/node/v24.20.0/bin/corepack pnpm start[0m
+             ├─[0;38;5;245m12126 sh -c "next start"[0m
+             └─[0;38;5;245m12127 "next-server (v16.3.0)"[0m
+
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: [PM2] Restoring processes located in /home/ubuntu/.pm2/dump.pm2
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: [PM2] Process /home/ubuntu/Projects/sportora-v2/apps/api/dist/server.js restored
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: [PM2] Process /usr/bin/bash restored
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: ┌────┬─────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: │ id │ name            │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: ├────┼─────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: │ 0  │ sportora-api    │ default     │ 1.0.0   │ fork    │ 933      │ 0s     │ 0    │ online    │ 0%       │ 26.4mb   │ ubuntu   │ disabled │
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: │ 1  │ sportora-web    │ default     │ N/A     │ fork    │ 934      │ 0s     │ 0    │ online    │ 0%       │ 25.7mb   │ ubuntu   │ disabled │
+Aug 30 04:48:04 ip-172-31-12-115 pm2[532]: └────┴─────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+Aug 30 04:48:04 ip-172-31-12-115 systemd[1]: Started pm2-ubuntu.service - PM2 process manager.

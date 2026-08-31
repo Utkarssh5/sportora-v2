@@ -74,12 +74,6 @@ export async function startLoginOtp(
     throw new Error("Invalid email or password");
   }
 
-  if (!user.isVerified) {
-    throw new Error(
-      "Please verify your email before logging in.",
-    );
-  }
-
   await createAndSendOtp(
     normalizedEmail,
     "LOGIN",
@@ -103,12 +97,6 @@ export async function verifyLoginOtp(
 
   if (!user) {
     throw new Error("User not found.");
-  }
-
-  if (!user.isVerified) {
-    throw new Error(
-      "Please verify your email before logging in.",
-    );
   }
 
   const accessToken = generateAccessToken({

@@ -35,11 +35,13 @@ router.post("/register/send", async (req, res, next) => {
 
 router.post("/register/verify", async (req, res, next) => {
   try {
-    const email = String(req.body.email || "")
+    const body = req.body ?? {};
+
+    const email = String(body.email || "")
       .trim()
       .toLowerCase();
 
-    const otp = String(req.body.otp || "").trim();
+    const otp = String(body.otp || "").trim();
 
     if (!email || !/^\d{6}$/.test(otp)) {
       return res.status(400).json({
@@ -98,11 +100,13 @@ router.post("/login/send", async (req, res, next) => {
 
 router.post("/login/verify", async (req, res, next) => {
   try {
-    const email = String(req.body.email || "")
+    const body = req.body ?? {};
+
+    const email = String(body.email || "")
       .trim()
       .toLowerCase();
 
-    const otp = String(req.body.otp || "").trim();
+    const otp = String(body.otp || "").trim();
 
     if (!email || !/^\d{6}$/.test(otp)) {
       return res.status(400).json({

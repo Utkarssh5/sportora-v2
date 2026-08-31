@@ -196,141 +196,6 @@ function buildStepRuntimeContext(
   };
 }
 
-
-
-function detectTournamentIntent(prompt: string): {
-  isTournamentIntent: boolean;
-  sport?: string | undefined;
-} {
-  const text = prompt.trim().toLowerCase();
-
-  const tournamentWords = [
-    "tournament",
-    "tournaments",
-    "tourna",
-    "competition",
-    "competitions",
-    "cup",
-    "championship",
-    "event",
-    "events",
-  ];
-
-  const discoveryWords = [
-    "show",
-    "find",
-    "search",
-    "dikhao",
-    "dikha",
-    "dikhana",
-    "chahiye",
-    "hai",
-    "hain",
-    "available",
-    "wale",
-    "wala",
-    "koi",
-    "batao",
-    "btao",
-  ];
-
-  const sports: Record<string, string> = {
-    cricket: "Cricket",
-    football: "Football",
-    badminton: "Badminton",
-    basketball: "Basketball",
-    tennis: "Tennis",
-    volleyball: "Volleyball",
-    hockey: "Hockey",
-    kabaddi: "Kabaddi",
-    athletics: "Athletics",
-    wrestling: "Wrestling",
-    boxing: "Boxing",
-    swimming: "Swimming",
-  };
-
-  const sport = Object.entries(sports).find(
-    ([key]) => text.includes(key)
-  )?.[1];
-
-  const hasTournamentWord =
-    tournamentWords.some((word) => text.includes(word));
-
-  const hasDiscoveryWord =
-    discoveryWords.some((word) => text.includes(word));
-
-  const hasSport = Boolean(sport);
-
-  return {
-    isTournamentIntent:
-      hasTournamentWord ||
-      (hasSport && hasDiscoveryWord) ||
-      (hasSport && text.length < 80),
-    sport,
-  };
-}
-
-function isNaturalConfirmation(prompt: string): boolean {
-  const text = prompt
-    .trim()
-    .toLowerCase()
-    .replace(/[!?.,]/g, "")
-    .replace(/\s+/g, " ");
-
-  const confirmations = [
-    "yes",
-    "yeah",
-    "yep",
-    "yup",
-    "haan",
-    "ha",
-    "han",
-    "haan bhai",
-    "ha bhai",
-    "haan kar do",
-    "ha kar do",
-    "han kar do",
-    "kar do",
-    "kar de",
-    "kardo",
-    "karde",
-    "theek hai",
-    "thik hai",
-    "okay",
-    "ok",
-    "okay kar do",
-    "go ahead",
-    "do it",
-    "yes please",
-  ];
-
-  return confirmations.includes(text);
-}
-
-function isNaturalNegative(prompt: string): boolean {
-  const text = prompt
-    .trim()
-    .toLowerCase()
-    .replace(/[!?.,]/g, "")
-    .replace(/\s+/g, " ");
-
-  const negatives = [
-    "no",
-    "nah",
-    "nope",
-    "nahi",
-    "nahin",
-    "mat karo",
-    "rehne do",
-    "cancel",
-    "cancel karo",
-    "cancel kar do",
-  ];
-
-  return negatives.includes(text);
-}
-
-
 export class AgentService {
 
   public static async chat(
@@ -603,66 +468,24 @@ export class AgentService {
         );
 
 
-      let response: any;
+      const response =
+        await gemini.models.generateContent({
+          model: GEMINI_MODEL,
 
-      try {
-        response =
-          await gemini.models.generateContent({
-            model: GEMINI_MODEL,
+          contents,
 
-            contents,
+          config: {
+            systemInstruction:
+              effectiveSystemPrompt,
 
-            config: {
-              systemInstruction:
-                effectiveSystemPrompt,
-
-              tools: [
-                {
-                  functionDeclarations:
-                    toolDeclarations,
-                },
-              ],
-            },
-          });
-      } catch (error: any) {
-        console.error("[AI] Gemini request failed:", error);
-
-        const errorMessage =
-          String(
-            error?.message ||
-            error?.error?.message ||
-            error ||
-            ""
-          );
-
-        const temporaryFailure =
-          errorMessage.includes("503") ||
-          errorMessage.toLowerCase().includes("high demand") ||
-          errorMessage.toLowerCase().includes("unavailable") ||
-          errorMessage.toLowerCase().includes("temporarily");
-
-        if (temporaryFailure) {
-          const fallback =
-            buildTemporaryAIResponse(prompt);
-
-          await aiRepository.saveMessage(
-            conversationId,
-            "model",
-            fallback
-          );
-
-          return {
-            success: true,
-            message: fallback,
-            conversationId,
-            data: {
-              fallback: true,
-            },
-          };
-        }
-
-        throw error;
-      }
+            tools: [
+              {
+                functionDeclarations:
+                  toolDeclarations,
+              },
+            ],
+          },
+        });
 
 
       const functionCalls =
@@ -1321,27 +1144,3 @@ export class AgentService {
 
 
 export const agentService = AgentService;
-
-
-
-function buildTemporaryAIResponse(prompt: string): string {
-  const text = prompt.trim().toLowerCase();
-
-  if (
-    /^(hi|hello|hey|hii|hlo)\b/.test(text) ||
-    text.includes("kaise ho") ||
-    text.includes("how are you")
-  ) {
-    return "Hi bhai 👋 Main Sportora AI hoon. Tournament search, registration, matches aur payments mein help kar sakta hoon. Batao kya karna hai?";
-  }
-
-  if (
-    text.includes("tournament") ||
-    text.includes("tournaments")
-  ) {
-    return "Haan bhai, tournament search kar sakta hoon. Sport batao — Cricket, Football, Badminton ya koi aur?";
-  }
-
-  return "Haan bhai 👋 Main ready hoon. Tournament search, registration, matches ya payment ke liye bolo.";
-}
-

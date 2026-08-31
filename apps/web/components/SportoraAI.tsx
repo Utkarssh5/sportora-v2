@@ -10,6 +10,26 @@ import {
   X,
 } from "lucide-react";
 
+
+function createMessageId(): string {
+  if (
+    typeof globalThis !== "undefined" &&
+    globalThis.crypto &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return (
+    "msg-" +
+    Date.now().toString(36) +
+    "-" +
+    Math.random().toString(36).slice(2) +
+    "-" +
+    Math.random().toString(36).slice(2)
+  );
+}
+
 type Tournament = {
   _id?: string;
   id?: string;
@@ -490,7 +510,7 @@ export default function SportoraAI() {
     setInput("");
     
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: createMessageId(),
       role: "user",
       text: trimmedPrompt,
     };
@@ -585,7 +605,7 @@ export default function SportoraAI() {
           : "I could not generate a response.");
 
       const assistantMessage: Message = {
-        id: crypto.randomUUID(),
+        id: createMessageId(),
         role: "assistant",
         text: answer,
         ...(tournaments.length > 0
@@ -608,7 +628,7 @@ export default function SportoraAI() {
       setMessages((previous) => [
         ...previous,
         {
-          id: crypto.randomUUID(),
+          id: createMessageId(),
           role: "assistant",
           text:
             `Sorry, I couldn't process that. ${message}`,
@@ -791,7 +811,7 @@ export default function SportoraAI() {
     if (!prompt || loading) return;
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: createMessageId(),
       role: "user",
       text: prompt,
     };
@@ -904,7 +924,7 @@ export default function SportoraAI() {
           : "I could not generate a response.");
 
       const assistantMessage: Message = {
-        id: crypto.randomUUID(),
+        id: createMessageId(),
         role: "assistant",
         text: answer,
         ...(tournaments.length > 0
@@ -927,7 +947,7 @@ export default function SportoraAI() {
       setMessages((previous) => [
         ...previous,
         {
-          id: crypto.randomUUID(),
+          id: createMessageId(),
           role: "assistant",
           text:
             `Sorry, I couldn't process that. ${message}`,
@@ -1106,7 +1126,7 @@ export default function SportoraAI() {
                                 setMessages((previous) => [
                                   ...previous,
                                   {
-                                    id: crypto.randomUUID(),
+                                    id: createMessageId(),
                                     role: "assistant",
                                     text: details,
                                   },
