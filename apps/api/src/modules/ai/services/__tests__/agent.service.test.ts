@@ -1,4 +1,6 @@
 import {
+  afterAll,
+  beforeAll,
   beforeEach,
   describe,
   expect,
@@ -157,6 +159,15 @@ const context = {
 };
 
 describe("AgentService reference integration", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00.000Z"));
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("injects deterministic date context for relative tournament discovery", async () => {
     mocks.generateContent.mockReset();
 
@@ -423,7 +434,6 @@ describe("AgentService reference integration", () => {
       "DETERMINISTIC DATE CONTEXT"
     );
   });
-
 
   beforeEach(() => {
     vi.clearAllMocks();
