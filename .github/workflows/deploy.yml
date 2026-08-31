@@ -45,10 +45,10 @@ jobs:
           JWT_SECRET: "ci_cd_test_secret"
 
       - name: Run API Tests
-        run: pnpm --dir apps/api run test
-        env:
-          MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
-          JWT_SECRET: "ci_cd_test_secret"
+  run: pnpm --dir apps/api exec vitest run src
+  env:
+    MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
+    JWT_SECRET: "ci_cd_test_secret"
 
   # ============================================================
   # JOB 2: DEPLOY TO EC2
