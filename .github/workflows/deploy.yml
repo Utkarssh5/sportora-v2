@@ -49,7 +49,7 @@ jobs:
           MONGODB_URI: "mongodb+srv://mock:mock@cluster.mongodb.net/test"
           JWT_SECRET: "ci_cd_test_secret"
 
-  deploy:
+    deploy:
     name: Deploy to EC2
     needs: build-and-test
 
@@ -64,7 +64,6 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script_stop: true
 
           script: |
             set -e
@@ -72,6 +71,17 @@ jobs:
             echo "======================================"
             echo "Starting Sportora deployment"
             echo "======================================"
+
+            # Load Node.js/Corepack environment
+            export PATH="/home/ubuntu/.nvm/versions/node/v24.20.0/bin:$PATH"
+
+            COREPACK="/home/ubuntu/.nvm/versions/node/v24.20.0/bin/corepack"
+
+            echo "Node version:"
+            node --version
+
+            echo "Corepack version:"
+            $COREPACK --version
 
             cd /home/ubuntu/Projects/sportora-v2
 
@@ -82,24 +92,29 @@ jobs:
             git reset --hard origin/frontend-redesign
 
             echo "Installing dependencies..."
-            pnpm install --frozen-lockfile
+            $COREPACK pnpm install --frozen-lockfile
 
             echo "Building API..."
             cd apps/api
-            pnpm run build
+            $COREPACK pnpm run build
 
             echo "Building Web..."
             cd ../web
             rm -rf .next
-            pnpm run build
+            $COREPACK pnpm run build
 
             echo "Restarting PM2 processes..."
             cd ../..
 
             PM2="/home/ubuntu/.local/share/pnpm/store/v11/links/@/pm2/7.0.4/426e76b7ecb4f81ffa39739a3166457267dcb4be9fa15f70b89742e823846417/node_modules/pm2/bin/pm2"
 
+            echo "Restarting API..."
             $PM2 restart sportora-api
+
+            echo "Restarting Web..."
             $PM2 restart sportora-web
+
+            echo "Saving PM2 process list..."
             $PM2 save
 
             echo "Checking Next.js..."
