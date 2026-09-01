@@ -45,6 +45,14 @@ describe("AI tournament discovery safety", () => {
   });
 
   it("searches tournaments without forcing approval status", async () => {
+    mocks.getTournaments.mockResolvedValueOnce({
+      tournaments: [{ _id: "tournament-1" }],
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+    });
+
     await tournamentTools.searchTournaments(
       {
         city: "Jaipur",
