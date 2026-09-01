@@ -1332,16 +1332,16 @@ function buildTemporaryAIResponse(prompt: string): string {
     text.includes("kaise ho") ||
     text.includes("how are you")
   ) {
-    return "Hi bhai 👋 Main Sportora AI hoon. Tournament search, registration, matches aur payments mein help kar sakta hoon. Batao kya karna hai?";
+    return "Hi! Main Sportora AI hoon. Main tournament search, registration, matches aur payments mein help kar sakta hoon. Aap kya karna chahenge?";
   }
 
   if (
     text.includes("tournament") ||
     text.includes("tournaments")
   ) {
-    return "Haan bhai, tournament search kar sakta hoon. Sport batao — Cricket, Football, Badminton ya koi aur?";
+    return "Main tournament search kar sakta hoon. Kripya sport batayein — Cricket, Football, Badminton ya koi aur?";
   }
 
-  return "Haan bhai 👋 Main ready hoon. Tournament search, registration, matches ya payment ke liye bolo.";
+  return "Main ready hoon. Tournament search, registration, matches ya payment mein main aapki madad kar sakta hoon.";
 }
 

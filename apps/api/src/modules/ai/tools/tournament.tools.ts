@@ -201,6 +201,50 @@ export const tournamentTools = {
         Math.min(args.limit ?? 10, 20)
       );
 
+      /*
+       * If no approved tournament matches the requested criteria,
+       * check whether matching tournaments are awaiting approval.
+       *
+       * This keeps the search truthful while giving the AI enough
+       * structured information to explain the situation naturally.
+       */
+      if (result.tournaments.length === 0) {
+        const pendingFilter: Record<string, unknown> = {
+          ...filter,
+          status: "PENDING_APPROVAL",
+        };
+
+        // Approval status, not registration availability,
+        // determines this fallback search.
+        delete pendingFilter.registrationDeadline;
+
+        const pendingResult =
+          await tournamentService.getTournaments(
+            pendingFilter,
+            1,
+            Math.min(args.limit ?? 10, 20)
+          );
+
+        if (pendingResult.tournaments.length > 0) {
+          return {
+            success: true,
+            data: {
+              tournaments: [],
+              total: 0,
+              page: 1,
+              limit: pendingResult.limit,
+              totalPages: 0,
+              availability: "MATCHING_NOT_APPROVED",
+              matchingButUnavailable:
+                pendingResult.tournaments,
+              actionable: false,
+            },
+            message:
+              "Matching tournaments were found, but they are currently awaiting approval.",
+          };
+        }
+      }
+
       return {
         success: true,
         data: result,

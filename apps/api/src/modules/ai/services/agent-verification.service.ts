@@ -103,6 +103,25 @@ export class AgentVerificationService {
       };
     }
 
+    /*
+     * MATCHING_NOT_APPROVED is a valid discovery observation,
+     * but it is not a completed discovery goal because there is
+     * no currently actionable approved tournament.
+     *
+     * Keep the structured observation available to Gemini so it
+     * can explain the situation naturally and suggest the next
+     * useful search direction.
+     */
+    if (
+      data?.availability === "MATCHING_NOT_APPROVED"
+    ) {
+      return {
+        verified: false,
+        reason:
+          "Matching tournaments were found, but they are currently awaiting approval and are not yet available for registration.",
+      };
+    }
+
     return {
       verified: true,
       reason:
