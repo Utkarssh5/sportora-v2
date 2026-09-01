@@ -379,7 +379,7 @@ export default function CrewProfilePage() {
 
             <div className="flex items-center gap-5 rounded-2xl border border-white/10 bg-black/30 px-5 py-4">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Rating
                 </p>
                 <div className="mt-1 flex items-center gap-1.5">
@@ -393,7 +393,7 @@ export default function CrewProfilePage() {
               <div className="h-10 w-px bg-white/10" />
 
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Experience
                 </p>
                 <p className="mt-1 text-2xl font-black">
@@ -423,7 +423,7 @@ export default function CrewProfilePage() {
                 <div>
                   <label
                     htmlFor="crew-role"
-                    className="text-[9px] font-black uppercase tracking-wider text-gray-600"
+                    className="text-[10px] font-black uppercase tracking-wider text-gray-400"
                   >
                     Primary Crew Role
                   </label>
@@ -443,7 +443,7 @@ export default function CrewProfilePage() {
 
                 {/* SPORTS */}
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                     Sports Expertise
                   </p>
 
@@ -483,7 +483,7 @@ export default function CrewProfilePage() {
                 <div>
                   <label
                     htmlFor="crew-skills"
-                    className="text-[9px] font-black uppercase tracking-wider text-gray-600"
+                    className="text-[10px] font-black uppercase tracking-wider text-gray-400"
                   >
                     Skills & Expertise
                   </label>
@@ -506,7 +506,7 @@ export default function CrewProfilePage() {
                 <div>
                   <label
                     htmlFor="crew-experience"
-                    className="text-[9px] font-black uppercase tracking-wider text-gray-600"
+                    className="text-[10px] font-black uppercase tracking-wider text-gray-400"
                   >
                     Experience
                   </label>
@@ -540,7 +540,7 @@ export default function CrewProfilePage() {
             ) : (
               <>
                 <div className="mt-6">
-                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                     Sports Expertise
                   </p>
 
@@ -557,7 +557,7 @@ export default function CrewProfilePage() {
                 </div>
 
                 <div className="mt-7">
-                  <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                     Skills & Expertise
                   </p>
 
@@ -592,7 +592,7 @@ export default function CrewProfilePage() {
 
             <div className="mt-6 space-y-5">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Name
                 </p>
                 <p className="mt-1 text-sm font-bold text-white">
@@ -601,7 +601,7 @@ export default function CrewProfilePage() {
               </div>
 
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Email
                 </p>
                 <p className="mt-1 break-all text-sm font-bold text-white">
@@ -610,7 +610,7 @@ export default function CrewProfilePage() {
               </div>
 
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Phone
                 </p>
                 <p className="mt-1 text-sm font-bold text-white">
@@ -619,7 +619,7 @@ export default function CrewProfilePage() {
               </div>
 
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-gray-600">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Location
                 </p>
                 <p className="mt-1 text-sm font-bold text-white">

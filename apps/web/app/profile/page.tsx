@@ -492,6 +492,24 @@ function ProfileContent() {
   }, []);
 
   useEffect(() => {
+    if (
+      activeSection !== 'crew' ||
+      crewProfileLoading ||
+      !crewProfile
+    ) {
+      return;
+    }
+
+    if (window.location.pathname !== '/crew/profile') {
+      window.location.replace('/crew/profile');
+    }
+  }, [
+    activeSection,
+    crewProfile,
+    crewProfileLoading,
+  ]);
+
+  useEffect(() => {
     if (!profile) return;
 
     let mounted = true;
@@ -1943,6 +1961,291 @@ function ProfileContent() {
             </div>
           )}
 
+          {/* GROUND CREW ENTRY / ACTIVATION */}
+          {activeSection === 'crew' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="lg:col-span-3"
+            >
+              {crewProfileLoading ? (
+                <div className="clean-glass rounded-3xl border border-white/10 p-8">
+                  <div className="flex items-center gap-3">
+                    <div className="h-3 w-3 rounded-full bg-[#00FF66] animate-pulse" />
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                      CHECKING GROUND CREW STATUS...
+                    </p>
+                  </div>
+                </div>
+              ) : crewProfile ? null : (
+                <div className="clean-glass relative overflow-hidden rounded-3xl border border-white/10 p-6 md:p-8">
+                  <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#00FF66]/5 blur-3xl" />
+
+                  <div className="relative">
+                    <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-6 w-6 text-[#00FF66]" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#00FF66]">
+                            SPORTORA OPERATIONS
+                          </span>
+                        </div>
+
+                        <h2 className="mt-3 text-3xl font-black italic uppercase tracking-tight text-white">
+                          BECOME GROUND CREW
+                        </h2>
+
+                        <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-gray-400">
+                          Join Sportora&apos;s official tournament operations
+                          network. Organizers can discover verified crew
+                          members based on role, sport expertise, skills,
+                          location, availability and experience.
+                        </p>
+                      </div>
+
+                      <span className="inline-flex shrink-0 items-center rounded-full border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-amber-300">
+                        NOT ACTIVATED
+                      </span>
+                    </div>
+
+                    {profile?.role !== 'PLAYER' &&
+                    profile?.role !== 'ORGANIZER' ? (
+                      <div className="mt-7 rounded-2xl border border-red-400/20 bg-red-400/5 p-5">
+                        <p className="text-sm font-black uppercase tracking-wide text-red-300">
+                          GROUND CREW NOT AVAILABLE
+                        </p>
+                        <p className="mt-2 text-xs leading-relaxed text-gray-400">
+                          Ground Crew activation is available only for Player
+                          and Organizer accounts.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mt-7 grid gap-4 md:grid-cols-3">
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#00FF66]">
+                              EVENT OPERATIONS
+                            </p>
+                            <p className="mt-2 text-sm font-bold text-white">
+                              Work at real tournaments
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                              Support scoring, officiating, ground operations,
+                              photography, coordination and event support.
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                              MATCHED BY SKILLS
+                            </p>
+                            <p className="mt-2 text-sm font-bold text-white">
+                              Show organizers what you can do
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                              Your crew role, sports expertise, skills,
+                              location and experience help organizers choose
+                              the right people.
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+                              TRUSTED WORKFLOW
+                            </p>
+                            <p className="mt-2 text-sm font-bold text-white">
+                              Assignment → work → verification
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                              Completed work follows Sportora&apos;s
+                              verification and payout workflow.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-7 rounded-3xl border border-[#00FF66]/15 bg-[#00FF66]/[0.025] p-6">
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#00FF66]">
+                              CREW APPLICATION
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                              Enter accurate information. Your profile will be
+                              visible to organizers when they search for crew.
+                            </p>
+                          </div>
+
+                          <div className="mt-6 grid gap-5 md:grid-cols-2">
+                            <div>
+                              <label
+                                htmlFor="crew-activation-role"
+                                className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-400"
+                              >
+                                Primary Crew Role
+                              </label>
+
+                              <select
+                                id="crew-activation-role"
+                                value={crewActivationRole}
+                                onChange={(event) =>
+                                  setCrewActivationRole(event.target.value)
+                                }
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#00FF66]/50"
+                              >
+                                <option value="">
+                                  Select your primary role
+                                </option>
+                                <option value="SCORER">Scorer</option>
+                                <option value="REFEREE">Referee</option>
+                                <option value="UMPIRE">Umpire</option>
+                                <option value="EVENT_STAFF">Event Staff</option>
+                                <option value="GROUND_STAFF">Ground Staff</option>
+                                <option value="PHOTOGRAPHER">Photographer</option>
+                                <option value="VIDEOGRAPHER">Videographer</option>
+                                <option value="COORDINATOR">Coordinator</option>
+                                <option value="VOLUNTEER">Volunteer</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label
+                                htmlFor="crew-activation-experience"
+                                className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-400"
+                              >
+                                Experience (Years)
+                              </label>
+
+                              <input
+                                id="crew-activation-experience"
+                                type="number"
+                                min="0"
+                                max="80"
+                                step="0.5"
+                                value={crewActivationExperience}
+                                onChange={(event) =>
+                                  setCrewActivationExperience(
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="e.g. 2"
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-bold text-white outline-none placeholder:text-gray-700 focus:border-[#00FF66]/50"
+                              />
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-400">
+                                Sports Expertise
+                              </p>
+
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {[
+                                  'Football',
+                                  'Cricket',
+                                  'Basketball',
+                                  'Badminton',
+                                  'Tennis',
+                                  'Volleyball',
+                                  'Kabaddi',
+                                  'Athletics',
+                                ].map((sport) => {
+                                  const selected =
+                                    crewActivationSports.includes(sport);
+
+                                  return (
+                                    <button
+                                      key={sport}
+                                      type="button"
+                                      onClick={() => {
+                                        setCrewActivationSports((current) =>
+                                          selected
+                                            ? current.filter(
+                                                (item) => item !== sport,
+                                              )
+                                            : [...current, sport],
+                                        );
+                                      }}
+                                      className={[
+                                        'rounded-full border px-4 py-2 text-[9px] font-black uppercase tracking-wider transition',
+                                        selected
+                                          ? 'border-[#00FF66]/40 bg-[#00FF66]/10 text-[#00FF66]'
+                                          : 'border-white/10 bg-white/[0.02] text-gray-500 hover:border-white/20 hover:text-white',
+                                      ].join(' ')}
+                                    >
+                                      {sport}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <label
+                                htmlFor="crew-activation-skills"
+                                className="text-[10px] font-black uppercase tracking-[0.16em] text-gray-400"
+                              >
+                                Skills
+                              </label>
+
+                              <input
+                                id="crew-activation-skills"
+                                type="text"
+                                value={crewActivationSkills}
+                                onChange={(event) =>
+                                  setCrewActivationSkills(event.target.value)
+                                }
+                                placeholder="e.g. scorekeeping, coordination, photography"
+                                className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-bold text-white outline-none placeholder:text-gray-700 focus:border-[#00FF66]/50"
+                              />
+
+                              <p className="mt-2 text-[10px] text-gray-600">
+                                Separate multiple skills with commas.
+                              </p>
+                            </div>
+                          </div>
+
+                          {crewActivationError && (
+                            <div className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3">
+                              <p className="text-xs font-bold leading-relaxed text-red-300">
+                                {crewActivationError}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCrewActivationRole('');
+                                setCrewActivationSports([]);
+                                setCrewActivationSkills('');
+                                setCrewActivationExperience('');
+                                setCrewActivationError('');
+                              }}
+                              className="rounded-full border border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-wider text-gray-400 transition hover:border-white/20 hover:text-white"
+                            >
+                              Reset
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleCrewActivation}
+                              disabled={crewActivationLoading}
+                              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#00FF66] px-6 py-3 text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-[#00FF66]/90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <ShieldCheck className="h-4 w-4" />
+                              {crewActivationLoading
+                                ? 'ACTIVATING...'
+                                : 'ACTIVATE GROUND CREW'}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* GROUND CREW WORK */}
           {activeSection === 'crew' && crewProfile && (
             <motion.div
@@ -2934,6 +3237,38 @@ function ProfileContent() {
                   className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
                   placeholder="Tell us about yourself..."
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    maxLength={100}
+                    autoComplete="address-level2"
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
+                    placeholder="e.g. Kanpur"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value)}
+                    maxLength={100}
+                    autoComplete="address-level1"
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 p-3.5 text-sm text-white focus:border-[#00FF66] focus:outline-none"
+                    placeholder="e.g. Uttar Pradesh"
+                  />
+                </div>
               </div>
 
               <div>
