@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 
+const API_URL =
+  process.env.SPORTORA_API_URL || "http://localhost:5000";
+
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
