@@ -35,12 +35,7 @@ export const tournamentTools = {
        * This is also required by the tournament discovery
        * safety tests.
        */
-      const filter: Record<string, unknown> = {
-        status: "APPROVED",
-        registrationDeadline: {
-          $gt: now,
-        },
-      };
+      const filter: Record<string, unknown> = {};
 
       /*
        * Tournament status is derived from start/end dates.

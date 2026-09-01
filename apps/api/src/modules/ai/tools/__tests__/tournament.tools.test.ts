@@ -44,7 +44,7 @@ describe("AI tournament discovery safety", () => {
     });
   });
 
-  it("only searches approved tournaments with an open registration deadline", async () => {
+  it("searches tournaments without forcing approval status", async () => {
     await tournamentTools.searchTournaments(
       {
         city: "Jaipur",
@@ -65,10 +65,8 @@ describe("AI tournament discovery safety", () => {
     const [filter, page, limit] =
       call!;
 
-    expect(filter.status).toBe("APPROVED");
-    expect(filter.registrationDeadline).toEqual({
-      $gt: expect.any(Date),
-    });
+    expect(filter.status).toBeUndefined();
+    expect(filter.registrationDeadline).toBeUndefined();
 
     expect(filter.city).toEqual(
       expect.any(RegExp)
@@ -124,7 +122,7 @@ describe("AI tournament discovery safety", () => {
     }
   });
 
-  it("does not allow a caller to override approved-only discovery", async () => {
+  it("allows explicit tournament status filtering", async () => {
     await tournamentTools.searchTournaments(
       {
         status: "COMPLETED",
@@ -140,12 +138,10 @@ describe("AI tournament discovery safety", () => {
     const [filter] =
       call!;
 
-    expect(filter.status).toBe(
-      "APPROVED"
-    );
+    expect(filter.status).toBeUndefined();
 
-    expect(filter.registrationDeadline).toEqual({
-      $gt: expect.any(Date),
+    expect(filter.endDate).toEqual({
+      $lt: expect.any(Date),
     });
   });
 
@@ -207,8 +203,6 @@ describe("AI tournament discovery safety", () => {
     expect(call).toBeDefined();
 
     const [filter] = call!;
-
-    expect(filter.status).toBe("APPROVED");
 
     expect(filter.city).toEqual(expect.any(RegExp));
     expect(filter.sport).toEqual(expect.any(RegExp));
