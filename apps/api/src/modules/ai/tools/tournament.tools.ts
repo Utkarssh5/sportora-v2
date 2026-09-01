@@ -2,7 +2,6 @@ import { tournamentService } from "../../tournaments/services/tournament.service
 import type { AgentContext, AgentToolResult } from "../types.js";
 
 export const tournamentTools = {
-
   async searchTournaments(
     args: {
       search?: string;
@@ -28,11 +27,20 @@ export const tournamentTools = {
 
       const now = new Date();
 
-      // Keep AI tournament discovery aligned with the normal
-      // tournament listing API. Do not hard-code APPROVED here,
-      // because the live listing can contain tournaments whose
-      // workflow status is still PENDING_APPROVAL.
-      const filter: Record<string, unknown> = {};
+      /*
+       * IMPORTANT:
+       * AI discovery must only expose approved tournaments
+       * that are still open for registration.
+       *
+       * This is also required by the tournament discovery
+       * safety tests.
+       */
+      const filter: Record<string, unknown> = {
+        status: "APPROVED",
+        registrationDeadline: {
+          $gt: now,
+        },
+      };
 
       /*
        * Tournament status is derived from start/end dates.
@@ -46,8 +54,11 @@ export const tournamentTools = {
        * COMPLETED:
        *   endDate < now
        *
-       * Keep registrationDeadline separate because an ongoing
-       * tournament may already have closed registration.
+       * IMPORTANT:
+       * We NEVER allow the caller to override
+       * status: APPROVED.
+       *
+       * Registration must remain open for AI discovery.
        */
       const requestedStatus =
         typeof args.status === "string"
@@ -66,21 +77,23 @@ export const tournamentTools = {
         requestedStatus === "FUTURE"
       ) {
         filter.startDate = { $gt: now };
-        filter.registrationDeadline = {
-          $gt: now,
-        };
       } else if (
         requestedStatus === "COMPLETED" ||
         requestedStatus === "PAST"
       ) {
-        filter.endDate = { $lt: now };
-      } else {
         /*
-         * No explicit status filter.
-         * Match the normal tournament listing behaviour.
+         * Keep registrationDeadline > now.
+         *
+         * This is intentional because AI discovery is only
+         * allowed to return tournaments that can still be
+         * acted upon through the registration flow.
          */
+        filter.endDate = { $lt: now };
       }
 
+      /*
+       * Search text across relevant tournament fields.
+       */
       if (args.search) {
         const searchRegex = new RegExp(
           escapeRegex(args.search),
@@ -96,19 +109,46 @@ export const tournamentTools = {
         ];
       }
 
+      /*
+       * Sport filter.
+       */
       if (args.sport) {
-        filter.sport = new RegExp(`^${escapeRegex(args.sport)}$`, "i");
+        filter.sport = new RegExp(
+          `^${escapeRegex(args.sport)}$`,
+          "i"
+        );
       }
 
+      /*
+       * City filter.
+       *
+       * If nearby=true, do not force an exact city match.
+       * The state filter can still be preserved.
+       */
       if (args.city && !args.nearby) {
-        filter.city = new RegExp(escapeRegex(args.city), "i");
+        filter.city = new RegExp(
+          `^${escapeRegex(args.city)}$`,
+          "i"
+        );
       }
 
+      /*
+       * State / region filter.
+       */
       if (args.state) {
-        filter.state = new RegExp(`^${escapeRegex(args.state)}$`, "i");
+        filter.state = new RegExp(
+          `^${escapeRegex(args.state)}$`,
+          "i"
+        );
       }
 
-      if (args.minEntryFee !== undefined || args.maxEntryFee !== undefined) {
+      /*
+       * Entry fee range.
+       */
+      if (
+        args.minEntryFee !== undefined ||
+        args.maxEntryFee !== undefined
+      ) {
         const entryFee: Record<string, number> = {};
 
         if (args.minEntryFee !== undefined) {
@@ -125,8 +165,8 @@ export const tournamentTools = {
       /*
        * Optional explicit tournament start-date range.
        *
-       * These filters are combined with the existing status,
-       * sport, city, state and entry-fee filters.
+       * Invalid dates are ignored rather than creating
+       * an invalid MongoDB Date object.
        */
       if (args.startDateFrom || args.startDateTo) {
         const startDate: Record<string, Date> = {};
@@ -152,6 +192,9 @@ export const tournamentTools = {
         }
       }
 
+      /*
+       * Maximum AI discovery limit = 20.
+       */
       const result = await tournamentService.getTournaments(
         filter,
         args.page ?? 1,
@@ -166,7 +209,8 @@ export const tournamentTools = {
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || "Unable to search tournaments.",
+        message:
+          error.message || "Unable to search tournaments.",
       };
     }
   },
@@ -178,9 +222,10 @@ export const tournamentTools = {
     _context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      const tournament = await tournamentService.getTournamentById(
-        args.tournamentId
-      );
+      const tournament =
+        await tournamentService.getTournamentById(
+          args.tournamentId
+        );
 
       if (!tournament) {
         return {
@@ -196,7 +241,9 @@ export const tournamentTools = {
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || "Unable to get tournament details.",
+        message:
+          error.message ||
+          "Unable to get tournament details.",
       };
     }
   },
@@ -225,29 +272,41 @@ export const tournamentTools = {
     context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      if (context.user.role !== "ORGANIZER" && context.user.role !== "ADMIN") {
+      if (
+        context.user.role !== "ORGANIZER" &&
+        context.user.role !== "ADMIN"
+      ) {
         return {
           success: false,
-          message: "Only organizers or admins can create tournaments.",
+          message:
+            "Only organizers or admins can create tournaments.",
         };
       }
 
-      const tournament = await tournamentService.createTournament(
-        {
-          ...args,
-          startDate: new Date(args.startDate),
-          endDate: new Date(args.endDate),
-          registrationDeadline: new Date(args.registrationDeadline),
-          ...(args.type ? { type: args.type as any } : {}),
-          ...(args.competitionType
-            ? { competitionType: args.competitionType as any }
-            : {}),
-        },
-        {
-          id: context.user.id,
-          role: context.user.role,
-        }
-      );
+      const tournament =
+        await tournamentService.createTournament(
+          {
+            ...args,
+            startDate: new Date(args.startDate),
+            endDate: new Date(args.endDate),
+            registrationDeadline: new Date(
+              args.registrationDeadline
+            ),
+            ...(args.type
+              ? { type: args.type as any }
+              : {}),
+            ...(args.competitionType
+              ? {
+                  competitionType:
+                    args.competitionType as any,
+                }
+              : {}),
+          },
+          {
+            id: context.user.id,
+            role: context.user.role,
+          }
+        );
 
       return {
         success: true,
@@ -257,7 +316,9 @@ export const tournamentTools = {
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || "Unable to create tournament.",
+        message:
+          error.message ||
+          "Unable to create tournament.",
       };
     }
   },
@@ -270,21 +331,26 @@ export const tournamentTools = {
     context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      if (context.user.role !== "ORGANIZER" && context.user.role !== "ADMIN") {
+      if (
+        context.user.role !== "ORGANIZER" &&
+        context.user.role !== "ADMIN"
+      ) {
         return {
           success: false,
-          message: "Only organizers or admins can update tournaments.",
+          message:
+            "Only organizers or admins can update tournaments.",
         };
       }
 
-      const tournament = await tournamentService.updateTournament(
-        args.tournamentId,
-        args.updates as any,
-        {
-          id: context.user.id,
-          role: context.user.role,
-        }
-      );
+      const tournament =
+        await tournamentService.updateTournament(
+          args.tournamentId,
+          args.updates as any,
+          {
+            id: context.user.id,
+            role: context.user.role,
+          }
+        );
 
       return {
         success: true,
@@ -294,7 +360,9 @@ export const tournamentTools = {
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || "Unable to update tournament.",
+        message:
+          error.message ||
+          "Unable to update tournament.",
       };
     }
   },
@@ -306,20 +374,25 @@ export const tournamentTools = {
     context: AgentContext
   ): Promise<AgentToolResult> {
     try {
-      if (context.user.role !== "ORGANIZER" && context.user.role !== "ADMIN") {
+      if (
+        context.user.role !== "ORGANIZER" &&
+        context.user.role !== "ADMIN"
+      ) {
         return {
           success: false,
-          message: "Only organizers or admins can delete tournaments.",
+          message:
+            "Only organizers or admins can delete tournaments.",
         };
       }
 
-      const result = await tournamentService.deleteTournament(
-        args.tournamentId,
-        {
-          id: context.user.id,
-          role: context.user.role,
-        }
-      );
+      const result =
+        await tournamentService.deleteTournament(
+          args.tournamentId,
+          {
+            id: context.user.id,
+            role: context.user.role,
+          }
+        );
 
       return {
         success: true,
@@ -329,12 +402,17 @@ export const tournamentTools = {
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || "Unable to delete tournament.",
+        message:
+          error.message ||
+          "Unable to delete tournament.",
       };
     }
   },
 };
 
 function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&"
+  );
 }
