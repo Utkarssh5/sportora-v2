@@ -106,11 +106,10 @@ jobs:
 
             echo "Finding PM2..."
 
-            PM2="$(find /home/ubuntu/.local/share/pnpm/store \
-              -path '*/pm2/bin/pm2' \
-              -type f \
-              -print \
-              -quit)"
+            export PNPM_HOME="/home/ubuntu/.local/share/pnpm"
+            export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
+
+            PM2="$(command -v pm2)"
 
             if [ -z "$PM2" ]; then
               echo "ERROR: PM2 executable not found"
@@ -119,6 +118,7 @@ jobs:
 
             echo "Using PM2:"
             echo "$PM2"
+            $PM2 --version
 
             echo "Restarting API..."
             $PM2 restart sportora-api
