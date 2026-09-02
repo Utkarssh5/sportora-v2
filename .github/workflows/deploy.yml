@@ -104,35 +104,27 @@ jobs:
             rm -rf .next
             $COREPACK pnpm run build
 
-            echo "Finding PM2..."
+            echo "Stopping existing services..."
 
-            export PNPM_HOME="/home/ubuntu/.local/share/pnpm"
-            export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
+            pkill -x next-server || true
+            pkill -f "node dist/server.js" || true
 
-            PM2="$(command -v pm2)"
+            sleep 2
 
-            if [ -z "$PM2" ]; then
-              echo "ERROR: PM2 executable not found"
-              exit 1
-            fi
+            echo "Starting API..."
+            cd /home/ubuntu/Projects/sportora-v2/apps/api
+            nohup $COREPACK pnpm start > /home/ubuntu/sportora-api.log 2>&1 &
 
-            echo "Using PM2:"
-            echo "$PM2"
-            $PM2 --version
+            echo "Starting Web..."
+            cd /home/ubuntu/Projects/sportora-v2/apps/web
+            nohup $COREPACK pnpm start > /home/ubuntu/sportora-web.log 2>&1 &
 
-            echo "Restarting API..."
-            $PM2 restart sportora-api
-
-            echo "Restarting Web..."
-            $PM2 restart sportora-web
-
-            echo "Saving PM2 process list..."
-            $PM2 save
-
-            echo "Waiting for Web..."
             sleep 5
 
-            echo "Checking Next.js..."
+            echo "Checking API..."
+            curl -f http://127.0.0.1:5000/health || curl -f http://127.0.0.1:5000 > /dev/null
+
+            echo "Checking Web..."
             curl -f http://127.0.0.1:3000 > /dev/null
 
             echo "Checking Nginx..."
