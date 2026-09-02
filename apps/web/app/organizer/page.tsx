@@ -110,13 +110,25 @@ export default function OrganizerDashboard() {
   const [myTournaments, setMyTournaments] = useState<OrganizerTournament[]>([]);
   const [loadingMyTournaments, setLoadingMyTournaments] = useState(false);
   const [showActiveTournamentDetails, setShowActiveTournamentDetails] =
-    useState(false);
+    useState(true);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [organizerVerificationStatus, setOrganizerVerificationStatus] =
     useState<string | null>(null);
+  const [organizerVerificationForm, setOrganizerVerificationForm] = useState({
+    organizationName: '',
+    governmentIdType: 'PAN',
+    governmentId: '',
+    documentUrl: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+  });
+  const [submittingOrganizerVerification, setSubmittingOrganizerVerification] =
+    useState(false);
   const [venueVerificationStatus, setVenueVerificationStatus] =
     useState<string | null>(null);
   const [venueVerificationRemarks, setVenueVerificationRemarks] =
@@ -615,11 +627,6 @@ export default function OrganizerDashboard() {
     loadSports();
   }, []);
 
-  const canCreateTournament =
-    userRole === 'ADMIN' ||
-    (userRole === 'ORGANIZER' &&
-      organizerVerificationStatus === 'APPROVED');
-
   const activeTournament = useMemo(
     () =>
       myTournaments.find((tournament) =>
@@ -632,6 +639,12 @@ export default function OrganizerDashboard() {
 
   const hasActiveTournament =
     userRole === 'ORGANIZER' && Boolean(activeTournament);
+
+  const canCreateTournament =
+    userRole === 'ADMIN' ||
+    (userRole === 'ORGANIZER' &&
+      organizerVerificationStatus === 'APPROVED' &&
+      !hasActiveTournament);
 
   const selectedIndiaState = useMemo(
     () =>
@@ -673,6 +686,51 @@ export default function OrganizerDashboard() {
     }));
     setError('');
     setSuccess('');
+  };
+
+  const handleOrganizerVerificationSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    setSubmittingOrganizerVerification(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch('/api/verification/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(organizerVerificationForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            'Unable to submit organizer verification.',
+        );
+      }
+
+      setOrganizerVerificationStatus('PENDING');
+      setSuccess(
+        data.message ||
+          'Organizer verification request submitted successfully.',
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to submit organizer verification.',
+      );
+    } finally {
+      setSubmittingOrganizerVerification(false);
+    }
   };
 
   const handleStateChange = (stateName: string) => {

@@ -5,7 +5,7 @@ import {
   sendOtpEmail,
 } from "./email.service.js";
 
-const OTP_TTL_MS = 60 * 1000;
+const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
 function generateOtp() {

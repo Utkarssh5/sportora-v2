@@ -1,6 +1,9 @@
 import { Router } from "express";
 import {
   startRegistrationOtp,
+  startForgotPasswordOtp,
+  verifyForgotPasswordOtp,
+  resetForgotPassword,
   verifyRegistrationOtp,
   startLoginOtp,
   verifyLoginOtp,
@@ -63,6 +66,78 @@ router.post("/register/verify", async (req, res, next) => {
         role: user.role,
         isVerified: user.isVerified,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/forgot-password/send", async (req, res, next) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    await startForgotPasswordOtp(email);
+
+    return res.json({
+      success: true,
+      message: "If an account exists with this email, a password reset OTP has been sent.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/forgot-password/verify", async (req, res, next) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const otp = String(req.body.otp || "").trim();
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    const result = await verifyForgotPasswordOtp(email, otp);
+
+    return res.json({
+      success: true,
+      message: "OTP verified successfully.",
+      resetToken: result.resetToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/forgot-password/reset", async (req, res, next) => {
+  try {
+    const resetToken = String(req.body.resetToken || "").trim();
+    const newPassword = String(req.body.newPassword || "");
+
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset token and new password are required",
+      });
+    }
+
+    await resetForgotPassword(
+      resetToken,
+      newPassword,
+    );
+
+    return res.json({
+      success: true,
+      message: "Password reset successfully. Please log in again.",
     });
   } catch (error) {
     next(error);

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sportora_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'sportora-super-secret-key';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || 'sportora_super_secret_refresh_key_2026';
 
 export function generateTokens(userId: string, role: string) {

@@ -412,6 +412,20 @@ export default function SportoraAI() {
   const recognitionRef =
     useRef<SpeechRecognitionInstance | null>(null);
 
+  const cleanTextForSpeech = (text: string): string => {
+    return text
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/(\*\*|__)(.*?)\1/g, "$2")
+      .replace(/[*_~`]/g, "")
+      .replace(/^\s*#{1,6}\s*/gm, "")
+      .replace(/^\s*[-+]\s+/gm, "")
+      .replace(/^\s*\d+\.\s+/gm, "")
+      .replace(/[|<>\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
   const speak = (text: string) => {
     if (
       typeof window === "undefined" ||
@@ -420,10 +434,14 @@ export default function SportoraAI() {
       return;
     }
 
+    const cleanText = cleanTextForSpeech(text);
+
+    if (!cleanText) return;
+
     window.speechSynthesis.cancel();
 
     const utterance =
-      new SpeechSynthesisUtterance(text);
+      new SpeechSynthesisUtterance(cleanText);
 
     utterance.lang = "en-IN";
     utterance.rate = 1;

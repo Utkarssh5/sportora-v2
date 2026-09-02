@@ -55,7 +55,7 @@ export async function sendOtpEmail(
     from,
     to: email,
     subject,
-    text: `Your Sportora OTP is ${otp}. It is valid for 1 minute. Do not share this OTP with anyone.`,
+    text: `Your Sportora OTP is ${otp}. It is valid for 10 minutes. Do not share this OTP with anyone.`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto">
         <h2>Sportora</h2>
@@ -63,7 +63,7 @@ export async function sendOtpEmail(
         <div style="font-size:32px;font-weight:700;letter-spacing:8px">
           ${otp}
         </div>
-        <p>This OTP expires in <b>1 minute</b>.</p>
+        <p>This OTP expires in <b>10 minutes</b>.</p>
         <p style="color:#777">
           Do not share this OTP with anyone.
         </p>

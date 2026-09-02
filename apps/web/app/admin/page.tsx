@@ -20,11 +20,11 @@ export default async function AdminPage() {
       }
     | null;
 
-  if (decoded?.role === 'ADMIN' && decoded.mustChangePassword) {
+  if ((decoded?.role === 'ADMIN' || decoded?.role === 'admin') && decoded.mustChangePassword) {
     redirect('/admin/change-password');
   }
 
-  if (!decoded || decoded.role !== 'ADMIN') {
+  if (!decoded || (decoded.role !== 'ADMIN' && decoded.role !== 'admin')) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <div className="w-full max-w-md rounded-2xl border border-rose-500/20 bg-slate-900 p-8 text-center">

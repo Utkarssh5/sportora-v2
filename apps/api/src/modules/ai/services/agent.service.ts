@@ -869,8 +869,8 @@ export class AgentService {
           const isRegistrationConfirmationFollowUp =
             toolName ===
               "confirm_pending_registration" &&
-            currentAgentState?.goal?.status ===
-              "WAITING_CONFIRMATION";
+            currentAgentState?.goal?.pendingAction ===
+              "CONFIRM_PAYMENT";
 
           if (
             !isTournamentRegistrationFollowUp &&

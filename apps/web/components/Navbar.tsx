@@ -73,8 +73,32 @@ export default function Navbar() {
   );
 
   useEffect(() => {
-    const loadStoredUser = () => {
+    const loadUser = async () => {
       try {
+        const response = await fetch('/api/user/profile', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+
+        const data = await response.json();
+        const profile = data?.profile;
+
+        if (response.ok && data?.success && profile) {
+          const currentUser = {
+            id: profile._id || profile.id,
+            fullName: profile.fullName || '',
+            email: profile.email || '',
+            role: profile.role || 'PLAYER',
+          };
+
+          setUser(currentUser);
+          localStorage.setItem(
+            'sportoraUser',
+            JSON.stringify(currentUser),
+          );
+          return;
+        }
+
         const storedUser = localStorage.getItem('sportoraUser');
 
         if (storedUser) {
@@ -83,15 +107,25 @@ export default function Navbar() {
           setUser(null);
         }
       } catch {
-        localStorage.removeItem('sportoraUser');
-        setUser(null);
+        try {
+          const storedUser = localStorage.getItem('sportoraUser');
+
+          if (storedUser) {
+            setUser(JSON.parse(storedUser));
+          } else {
+            setUser(null);
+          }
+        } catch {
+          localStorage.removeItem('sportoraUser');
+          setUser(null);
+        }
       }
     };
 
-    loadStoredUser();
+    loadUser();
 
     const handleAuthChange = () => {
-      loadStoredUser();
+      loadUser();
     };
 
     window.addEventListener(
