@@ -106,8 +106,8 @@ jobs:
 
             echo "Stopping existing services..."
 
-            pkill -x next-server || true
-            pkill -f "node dist/server.js" || true
+            fuser -k 3000/tcp 2>/dev/null || true
+            fuser -k 5000/tcp 2>/dev/null || true
 
             sleep 2
 
