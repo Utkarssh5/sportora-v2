@@ -7,7 +7,7 @@ const API_URL =
 export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get('accessToken')?.value;
+    const accessToken = cookieStore.get('adminAccessToken')?.value;
 
     if (!accessToken) {
       return NextResponse.json(

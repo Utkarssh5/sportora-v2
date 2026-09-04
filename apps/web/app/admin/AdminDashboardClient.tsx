@@ -188,7 +188,7 @@ const [supportStatusFilter, setSupportStatusFilter] =
             ? 'Good evening'
             : 'Good evening';
 
-    fetch('/api/user/profile', {
+    fetch('/api/admin/me', {
       credentials: 'include',
       cache: 'no-store',
     })

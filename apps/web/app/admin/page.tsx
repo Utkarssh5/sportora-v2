@@ -1,24 +1,51 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifyAccessToken } from '@/lib/auth';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 import AdminDashboardClient from './AdminDashboardClient';
 
 export default async function AdminPage() {
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get('accessToken')?.value;
+  let accessToken = cookieStore.get('adminAccessToken')?.value;
+  const refreshToken = cookieStore.get('adminRefreshToken')?.value;
 
-  if (!accessToken) {
+  if (!accessToken && !refreshToken) {
     redirect('/');
   }
 
-  const decoded = verifyAccessToken(accessToken) as
-    | {
-        userId?: string;
-        id?: string;
-        role?: string;
-        mustChangePassword?: boolean;
-      }
-    | null;
+  let decoded = accessToken
+    ? (verifyAccessToken(accessToken) as
+        | {
+            userId?: string;
+            id?: string;
+            role?: string;
+            mustChangePassword?: boolean;
+          }
+        | null)
+    : null;
+
+  // If the short-lived access token expired, use the existing refresh token
+  // before deciding that the session is gone.
+  if (!decoded && refreshToken) {
+    const authResult = await authenticatedFetch(
+      '/api/v1/users/me',
+      accessToken,
+      refreshToken,
+      { method: 'GET' },
+    );
+
+    if (authResult.response.ok && authResult.accessToken) {
+      accessToken = authResult.accessToken;
+      decoded = verifyAccessToken(accessToken) as
+        | {
+            userId?: string;
+            id?: string;
+            role?: string;
+            mustChangePassword?: boolean;
+          }
+        | null;
+    }
+  }
 
   if ((decoded?.role === 'ADMIN' || decoded?.role === 'admin') && decoded.mustChangePassword) {
     redirect('/admin/change-password');

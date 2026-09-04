@@ -8,7 +8,7 @@ export async function PATCH(req: Request) {
   try {
     const cookieStore = await cookies();
 
-    const accessToken = cookieStore.get('accessToken')?.value;
+    const accessToken = cookieStore.get('adminAccessToken')?.value;
 
     if (!accessToken) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function PATCH(req: Request) {
     const result = NextResponse.json(data);
 
     if (data?.data?.accessToken) {
-      result.cookies.set('accessToken', data.data.accessToken, {
+      result.cookies.set('adminAccessToken', data.data.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

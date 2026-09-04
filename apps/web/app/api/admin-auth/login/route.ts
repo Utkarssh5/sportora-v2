@@ -79,13 +79,28 @@ export async function POST(req: Request) {
       },
     });
 
-    result.cookies.set('accessToken', accessToken, {
+    result.cookies.set('adminAccessToken', accessToken, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 15 * 60,
     });
+
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) {
+      const refreshTokenMatch = setCookie.match(/refreshToken=([^;]+)/);
+
+      if (refreshTokenMatch?.[1]) {
+        result.cookies.set('adminRefreshToken', refreshTokenMatch[1], {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60,
+        });
+      }
+    }
 
     return result;
   } catch (error) {

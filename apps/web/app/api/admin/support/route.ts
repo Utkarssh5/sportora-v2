@@ -5,8 +5,8 @@ import { authenticatedFetch } from '@/lib/authenticated-fetch';
 export async function GET(req: Request) {
   try {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get('accessToken')?.value;
-    const refreshToken = cookieStore.get('refreshToken')?.value;
+    const accessToken = cookieStore.get('adminAccessToken')?.value;
+    const refreshToken = cookieStore.get('adminRefreshToken')?.value;
 
     const url = new URL(req.url);
     const params = new URLSearchParams();
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
     });
 
     if (authResult.refreshed) {
-      result.cookies.set('accessToken', authResult.accessToken, {
+      result.cookies.set('adminAccessToken', authResult.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -78,8 +78,8 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get('accessToken')?.value;
-    const refreshToken = cookieStore.get('refreshToken')?.value;
+    const accessToken = cookieStore.get('adminAccessToken')?.value;
+    const refreshToken = cookieStore.get('adminRefreshToken')?.value;
 
     const url = new URL(req.url);
     const ticketId = url.searchParams.get('ticketId');
@@ -132,7 +132,7 @@ export async function PATCH(req: Request) {
     });
 
     if (authResult.refreshed) {
-      result.cookies.set('accessToken', authResult.accessToken, {
+      result.cookies.set('adminAccessToken', authResult.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

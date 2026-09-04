@@ -104,22 +104,19 @@ jobs:
             rm -rf .next
             $COREPACK pnpm run build
 
-            echo "Stopping existing services..."
+            echo "Reloading services with PM2..."
 
-            fuser -k 3000/tcp 2>/dev/null || true
-            fuser -k 5000/tcp 2>/dev/null || true
+            cd /home/ubuntu/Projects/sportora-v2
 
-            sleep 2
+            PM2="/home/ubuntu/.nvm/versions/node/v24.20.0/lib/node_modules/pm2/bin/pm2"
 
-            echo "Starting API..."
-            cd /home/ubuntu/Projects/sportora-v2/apps/api
-            nohup $COREPACK pnpm start > /home/ubuntu/sportora-api.log 2>&1 &
-
-            echo "Starting Web..."
-            cd /home/ubuntu/Projects/sportora-v2/apps/web
-            nohup $COREPACK pnpm start > /home/ubuntu/sportora-web.log 2>&1 &
+            $PM2 startOrReload ecosystem.config.cjs --update-env
+            $PM2 save
 
             sleep 5
+
+            echo "PM2 status:"
+            $PM2 list
 
             echo "Checking API..."
             curl -f http://127.0.0.1:5000/health || curl -f http://127.0.0.1:5000 > /dev/null

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 const API_URL =
   process.env.SPORTORA_API_URL || 'http://localhost:5000';
@@ -8,8 +9,9 @@ export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('accessToken')?.value;
+    const refreshToken = cookieStore.get('refreshToken')?.value;
 
-    if (!accessToken) {
+    if (!accessToken && !refreshToken) {
       return NextResponse.json(
         {
           success: false,
@@ -32,20 +34,21 @@ export async function POST(req: Request) {
       );
     }
 
-    const response = await fetch(
-      `${API_URL}/api/v1/payment/create-order`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+    const { response, accessToken: activeAccessToken, refreshed } =
+      await authenticatedFetch(
+        '/api/v1/payment/create-order',
+        accessToken,
+        refreshToken,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tournamentId,
+          }),
         },
-        body: JSON.stringify({
-          tournamentId,
-        }),
-        cache: 'no-store',
-      },
-    );
+      );
 
     const data = await response.json();
 
@@ -62,9 +65,21 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json(data, {
+    const nextResponse = NextResponse.json(data, {
       status: response.status,
     });
+
+    if (refreshed && activeAccessToken) {
+      nextResponse.cookies.set('accessToken', activeAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 15,
+      });
+    }
+
+    return nextResponse;
   } catch (error) {
     console.error('Payment create-order proxy error:', error);
 

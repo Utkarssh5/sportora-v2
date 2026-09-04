@@ -2,26 +2,21 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET() {
   try {
-    const { id } = await params;
-    const body = await request.json().catch(() => ({}));
-
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get('adminAccessToken')?.value;
-    const refreshToken = cookieStore.get('adminRefreshToken')?.value;
+
+    const accessToken =
+      cookieStore.get('adminAccessToken')?.value;
+    const refreshToken =
+      cookieStore.get('adminRefreshToken')?.value;
 
     const authResult = await authenticatedFetch(
-      `/api/v1/tournament/${id}/reject`,
+      '/api/v1/users/me',
       accessToken,
       refreshToken,
       {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        method: 'GET',
       },
     );
 
@@ -32,16 +27,30 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-          error: data.message || data.error || 'Failed to reject tournament.',
+          error:
+            data.message ||
+            data.error ||
+            'Failed to fetch admin profile',
         },
         { status: response.status },
       );
     }
 
+    const profile = data?.data;
+
+    if (!profile || (profile.role !== 'ADMIN' && profile.role !== 'admin')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Admin access is required.',
+        },
+        { status: 403 },
+      );
+    }
+
     const result = NextResponse.json({
       success: true,
-      message: data.message || 'Tournament rejected.',
-      data: data.data,
+      profile,
     });
 
     if (authResult.refreshed) {
@@ -56,10 +65,13 @@ export async function PATCH(
 
     return result;
   } catch (error) {
-    console.error('Admin tournament rejection proxy error:', error);
+    console.error('Admin profile proxy error:', error);
 
     return NextResponse.json(
-      { success: false, error: 'Unable to connect to Sportora API' },
+      {
+        success: false,
+        error: 'Unable to connect to Sportora API',
+      },
       { status: 500 },
     );
   }

@@ -52,6 +52,11 @@ type Message = {
   role: "user" | "assistant";
   text: string;
   tournaments?: Tournament[];
+  paymentConfirmation?: {
+    amount: number;
+    tournamentTitle?: string;
+  };
+  paymentConfirmationHandled?: boolean;
 };
 
 type SpeechRecognitionEventLike = {
@@ -221,21 +226,26 @@ async function handleAIPaymentOrder(
               verifiedData?.ticket?._id;
 
             const details = [
-              "Payment verified successfully.",
+              "🎉 You’re registered!",
+              tournamentTitle
+                ? `🏆 ${tournamentTitle}`
+                : "",
+              "",
+              "✅ Payment verified",
+              "✅ Registration confirmed",
               registrationId
-                ? `Registration: ${registrationId}.`
+                ? `📝 Registration: ${registrationId}`
                 : "",
               ticketId
-                ? `Ticket: ${ticketId}.`
+                ? `🎟️ Ticket: ${ticketId}`
                 : "",
+              "",
+              "You’re all set. Good luck for the tournament! ⚽",
             ]
               .filter(Boolean)
-              .join(" ");
+              .join("\\n");
 
-            succeed(
-              details ||
-                "Payment verified successfully. Your tournament registration has been processed.",
-            );
+            succeed(details);
           } catch (error) {
             fail(
               error instanceof Error
@@ -405,7 +415,7 @@ export default function SportoraAI() {
       id: "welcome",
       role: "assistant",
       text:
-        "Hi! I’m Sportora AI. You can ask me about tournaments, registrations, matches, profiles, or anything related to Sportora.",
+        "👋 Hey! I’m Sportora AI. Tell me what you’re looking for and I’ll help you get it done.",
     },
   ]);
 
@@ -508,6 +518,24 @@ export default function SportoraAI() {
     setListening(false);
   };
 
+  const handlePaymentConfirmationAction = async (
+    prompt: string,
+    messageId: string,
+  ) => {
+    setMessages((previous) =>
+      previous.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              paymentConfirmationHandled: true,
+            }
+          : message,
+      ),
+    );
+
+    await sendQuickMessage(prompt);
+  };
+
   const sendQuickMessage = async (prompt: string) => {
     const trimmedPrompt = prompt.trim();
 
@@ -594,6 +622,18 @@ export default function SportoraAI() {
       let paymentResultMessage: string | null =
         null;
 
+      const paymentConfirmation =
+        data.data?.paymentRequired &&
+        data.data?.confirmationRequired &&
+        Number(data.data?.entryFee) > 0
+          ? {
+              amount: Number(data.data.entryFee),
+              tournamentTitle:
+                data.data?.tournamentTitle ||
+                data.data?.title,
+            }
+          : undefined;
+
       if (aiPaymentOrder) {
         paymentResultMessage =
           await handleAIPaymentOrder(
@@ -628,6 +668,9 @@ export default function SportoraAI() {
         text: answer,
         ...(tournaments.length > 0
           ? { tournaments }
+          : {}),
+        ...(paymentConfirmation
+          ? { paymentConfirmation }
           : {}),
       };
 
@@ -1032,6 +1075,94 @@ export default function SportoraAI() {
       </div>
 
       <div className="flex max-h-[420px] min-h-[300px] flex-col gap-3 overflow-y-auto p-4">
+        {messages.length === 1 && !loading && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                void sendQuickMessage("Find football tournaments for me")
+              }
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-[#00FF66]/40 hover:bg-white/[0.07]"
+            >
+              <div className="mb-1 text-lg">⚽</div>
+              <div className="text-xs font-semibold text-white">
+                Find Tournament
+              </div>
+              <div className="mt-1 text-[10px] text-white/40">
+                Discover tournaments
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void sendQuickMessage("Find football tournaments near me")
+              }
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-[#00FF66]/40 hover:bg-white/[0.07]"
+            >
+              <div className="mb-1 text-lg">📍</div>
+              <div className="text-xs font-semibold text-white">
+                Tournaments Near Me
+              </div>
+              <div className="mt-1 text-[10px] text-white/40">
+                Find nearby games
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void sendQuickMessage("Show me upcoming football matches")
+              }
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-[#00FF66]/40 hover:bg-white/[0.07]"
+            >
+              <div className="mb-1 text-lg">🏆</div>
+              <div className="text-xs font-semibold text-white">
+                Upcoming Matches
+              </div>
+              <div className="mt-1 text-[10px] text-white/40">
+                See what’s coming
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void sendQuickMessage("Help me register for a tournament")
+              }
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-[#00FF66]/40 hover:bg-white/[0.07]"
+            >
+              <div className="mb-1 text-lg">📝</div>
+              <div className="text-xs font-semibold text-white">
+                Register
+              </div>
+              <div className="mt-1 text-[10px] text-white/40">
+                Get me into a tournament
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void sendQuickMessage("Show my tournament registrations")
+              }
+              className="col-span-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-[#00FF66]/40 hover:bg-white/[0.07]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-lg">💳</div>
+                <div>
+                  <div className="text-xs font-semibold text-white">
+                    My Registrations
+                  </div>
+                  <div className="mt-1 text-[10px] text-white/40">
+                    Check your registrations and payments
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+
         {messages.map((message) => (
           <div
             key={message.id}
@@ -1042,6 +1173,68 @@ export default function SportoraAI() {
             }
           >
             <div>{message.text}</div>
+
+            {message.paymentConfirmation && (
+              <div className="mt-3 rounded-2xl border border-[#00FF66]/20 bg-black/20 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-lg">💳</span>
+                  <span className="text-sm font-semibold text-white">
+                    Registration Payment
+                  </span>
+                </div>
+
+                {message.paymentConfirmation.tournamentTitle && (
+                  <div className="mb-2 text-xs text-white/60">
+                    🏆 {message.paymentConfirmation.tournamentTitle}
+                  </div>
+                )}
+
+                <div className="mb-3 flex items-center justify-between rounded-xl bg-white/[0.04] px-3 py-2">
+                  <span className="text-xs text-white/50">
+                    Entry fee
+                  </span>
+                  <span className="text-base font-bold text-[#00FF66]">
+                    ₹{message.paymentConfirmation.amount}
+                  </span>
+                </div>
+
+                {message.paymentConfirmationHandled ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-center text-xs text-white/50">
+                    ✓ Confirmation submitted
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() =>
+                        void handlePaymentConfirmationAction(
+                          "Yes, I confirm and want to proceed with the payment",
+                          message.id,
+                        )
+                      }
+                      className="rounded-xl bg-[#00FF66] px-3 py-2.5 text-xs font-bold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      ✅ Confirm & Pay
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() =>
+                        void handlePaymentConfirmationAction(
+                          "No, cancel the registration and payment",
+                          message.id,
+                        )
+                      }
+                      className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      ❌ Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {message.tournaments &&
               message.tournaments.length > 0 && (
@@ -1154,9 +1347,9 @@ export default function SportoraAI() {
                                   `Here are the details for ${tournament.title}. What would you like to do next?`
                                 );
                               }}
-                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10"
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:border-white/20 hover:bg-white/10"
                             >
-                              View Details
+                              👀 View Details
                             </button>
 
                             <button
@@ -1166,9 +1359,9 @@ export default function SportoraAI() {
                                   `register me for ${tournament.title}`
                                 );
                               }}
-                              className="rounded-xl bg-[#00FF66] px-3 py-2 text-xs font-semibold text-black transition hover:brightness-110"
+                              className="rounded-xl bg-[#00FF66] px-3 py-2 text-xs font-semibold text-black shadow-[0_0_20px_rgba(0,255,102,0.12)] transition hover:brightness-110"
                             >
-                              Register
+                              📝 Register
                             </button>
                           </div>
 

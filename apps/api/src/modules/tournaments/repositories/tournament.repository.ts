@@ -17,6 +17,7 @@ class TournamentRepository {
   ) {
     return await TournamentModel
       .find(filter)
+      .populate("organizerId", "fullName email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);

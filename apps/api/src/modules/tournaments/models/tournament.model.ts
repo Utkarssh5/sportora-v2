@@ -54,7 +54,7 @@ export interface ITournament extends Document {
 
 const TournamentSchema = new Schema<ITournament>(
   {
-    organizerId: { type: Schema.Types.ObjectId, ref: 'Organizer', required: true },
+    organizerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: true },
     sport: { type: String, required: true },
     format: { type: String, required: true },
