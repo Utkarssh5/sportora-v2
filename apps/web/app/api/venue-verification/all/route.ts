@@ -6,8 +6,8 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
 
-    const accessToken = cookieStore.get('accessToken')?.value;
-    const refreshToken = cookieStore.get('refreshToken')?.value;
+    const accessToken = cookieStore.get('adminAccessToken')?.value;
+    const refreshToken = cookieStore.get('adminRefreshToken')?.value;
 
     const authResult = await authenticatedFetch(
       '/api/v1/venue-verification/all',

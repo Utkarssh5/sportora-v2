@@ -21,19 +21,43 @@ export async function POST(req: Request) {
 
     const data = await response.json();
 
-    const result = NextResponse.json(
-      data,
-      { status: response.status },
-    );
+    if (!response.ok) {
+      return NextResponse.json(data, {
+        status: response.status,
+      });
+    }
 
-    const setCookie =
-      response.headers.get('set-cookie');
+    const result = NextResponse.json(data, {
+      status: response.status,
+    });
+
+    const accessToken = data?.data?.accessToken;
+
+    if (accessToken) {
+      result.cookies.set('accessToken', accessToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 15 * 60,
+      });
+    }
+
+    const setCookie = response.headers.get('set-cookie');
 
     if (setCookie) {
-      result.headers.set(
-        'set-cookie',
-        setCookie,
-      );
+      const refreshTokenMatch =
+        setCookie.match(/refreshToken=([^;]+)/);
+
+      if (refreshTokenMatch?.[1]) {
+        result.cookies.set('refreshToken', refreshTokenMatch[1], {
+          httpOnly: true,
+          secure: false,
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60,
+        });
+      }
     }
 
     return result;

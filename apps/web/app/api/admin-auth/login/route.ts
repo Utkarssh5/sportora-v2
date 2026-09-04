@@ -81,7 +81,7 @@ export async function POST(req: Request) {
 
     result.cookies.set('adminAccessToken', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'lax',
       path: '/',
       maxAge: 15 * 60,
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       if (refreshTokenMatch?.[1]) {
         result.cookies.set('adminRefreshToken', refreshTokenMatch[1], {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: false,
           sameSite: 'strict',
           path: '/',
           maxAge: 7 * 24 * 60 * 60,
